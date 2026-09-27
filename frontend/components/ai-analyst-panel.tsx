@@ -1,0 +1,550 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import {
+  fetchAIStatus,
+  askAIQuestion,
+  generateAIVisualization,
+  explainAIVisual,
+  fetchAIInsights,
+  AIAvailabilityResponse,
+  NLQuestionResponse,
+  AIVisualizeResponse,
+  AIExplainResponse,
+  AIInsight,
+  AIVisualizationSuggestion,
+} from "@/lib/ai-api";
+import { VisualizationChart } from "@/components/visualization-chart";
+import { Bot, Sparkles, HelpCircle, BarChart3, Lightbulb, Check, X, AlertTriangle, ShieldCheck } from "lucide-react";
+
+interface AIAnalystPanelProps {
+  datasetId?: string;
+  dashboardId?: string;
+  onApproveVisual?: (suggestion: AIVisualizationSuggestion) => void;
+}
+
+export function AIAnalystPanel({ datasetId, dashboardId, onApproveVisual }: AIAnalystPanelProps) {
+  const [aiStatus, setAiStatus] = useState<AIAvailabilityResponse | null>(null);
+  const [activeTab, setActiveTab] = useState<"query" | "visualize" | "insights" | "explain">("query");
+
+  // NL Query State
+  const [question, setQuestion] = useState("");
+  const [queryLoading, setQueryLoading] = useState(false);
+  const [queryResult, setQueryResult] = useState<NLQuestionResponse | null>(null);
+  const [queryError, setQueryError] = useState<string | null>(null);
+
+  // Visualize State
+  const [visPrompt, setVisPrompt] = useState("");
+  const [visLoading, setVisLoading] = useState(false);
+  const [visResult, setVisResult] = useState<AIVisualizeResponse | null>(null);
+  const [visError, setVisError] = useState<string | null>(null);
+
+  // Insights State
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insights, setInsights] = useState<AIInsight[]>([]);
+  const [insightsError, setInsightsError] = useState<string | null>(null);
+
+  // Explain State
+  const [explainLoading, setExplainLoading] = useState(false);
+  const [explainResult, setExplainResult] = useState<AIExplainResponse | null>(null);
+  const [explainError, setExplainError] = useState<string | null>(null);
+
+  // User approval feedback
+  const [approvalFeedback, setApprovalFeedback] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchAIStatus().then(setAiStatus).catch(console.error);
+  }, []);
+
+  const handleAskQuestion = async (qText?: string) => {
+    const targetQ = qText || question;
+    if (!targetQ.trim()) return;
+    setQueryLoading(true);
+    setQueryError(null);
+    setQueryResult(null);
+    setApprovalFeedback(null);
+    try {
+      const res = await askAIQuestion({
+        question: targetQ,
+        dataset_id: datasetId,
+        dashboard_id: dashboardId,
+      });
+      setQueryResult(res);
+    } catch (err: any) {
+      setQueryError(err?.message || "Failed to process question");
+    } finally {
+      setQueryLoading(false);
+    }
+  };
+
+  const handleGenerateVis = async () => {
+    if (!visPrompt.trim() || !datasetId) return;
+    setVisLoading(true);
+    setVisError(null);
+    setVisResult(null);
+    setApprovalFeedback(null);
+    try {
+      const res = await generateAIVisualization({
+        prompt: visPrompt,
+        dataset_id: datasetId,
+      });
+      setVisResult(res);
+    } catch (err: any) {
+      setVisError(err?.message || "Failed to generate visualization");
+    } finally {
+      setVisLoading(false);
+    }
+  };
+
+  const handleGetInsights = async () => {
+    if (!datasetId) return;
+    setInsightsLoading(true);
+    setInsightsError(null);
+    try {
+      const res = await fetchAIInsights({ dataset_id: datasetId, dashboard_id: dashboardId });
+      setInsights(res.insights || []);
+    } catch (err: any) {
+      setInsightsError(err?.message || "Failed to fetch AI insights");
+    } finally {
+      setInsightsLoading(false);
+    }
+  };
+
+  const handleExplainVisual = async () => {
+    if (!datasetId) return;
+    setExplainLoading(true);
+    setExplainError(null);
+    try {
+      const sampleSpec = visResult?.suggestion || queryResult?.visual_suggestion || {
+        chart_type: "bar",
+        title: "Active Visual Spec",
+        dimensions: [{ field: "category" }],
+        measures: [{ field: "revenue", aggregation: "sum" }],
+      };
+      const res = await explainAIVisual({
+        visual_spec: sampleSpec,
+        dataset_id: datasetId,
+        dashboard_id: dashboardId,
+      });
+      setExplainResult(res);
+    } catch (err: any) {
+      setExplainError(err?.message || "Failed to generate visual explanation");
+    } finally {
+      setExplainLoading(false);
+    }
+  };
+
+  const handleApprove = (suggestion?: AIVisualizationSuggestion) => {
+    if (suggestion && onApproveVisual) {
+      onApproveVisual(suggestion);
+      setApprovalFeedback("Approved! Suggestion applied to Dashboard.");
+    } else {
+      setApprovalFeedback("Approved! AI suggestion recorded.");
+    }
+  };
+
+  const handleReject = () => {
+    setQueryResult(null);
+    setVisResult(null);
+    setApprovalFeedback("Rejected AI suggestion.");
+  };
+
+  const isAIEnabled = aiStatus?.status === "enabled";
+
+  return (
+    <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-6 shadow-xl space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-cyan-500/10 border border-cyan-500/30 rounded-lg text-cyan-400">
+            <Bot className="w-6 h-6" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
+              KaanViz AI Analyst
+              <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-medium">
+                Phase 8 — Optional
+              </span>
+            </h2>
+            <p className="text-sm text-slate-400">
+              Natural-language data Q&A, prompt-to-visual generation, Explain Visual & structured insights.
+            </p>
+          </div>
+        </div>
+
+        {/* AI Status Badge */}
+        <div>
+          {aiStatus ? (
+            isAIEnabled ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                AI Active ({aiStatus.provider})
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                AI Disabled / Unconfigured
+              </span>
+            )
+          ) : (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 animate-pulse">
+              Checking AI Status...
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Disabled Banner Notice */}
+      {!isAIEnabled && aiStatus && (
+        <div className="p-4 bg-amber-950/30 border border-amber-500/30 rounded-lg text-amber-300 text-sm flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 shrink-0 text-amber-400 mt-0.5" />
+          <div>
+            <span className="font-semibold text-amber-200">AI Analyst is currently unavailable or disabled.</span>
+            <p className="mt-1 text-xs text-amber-300/80">
+              {aiStatus.message || "Set AI_ENABLED=true and configure AI_PROVIDER in environment variables."} Core KaanViz deterministic analytics, query engine, and interactive dashboard builder remain 100% operational.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Navigation Tabs */}
+      <div className="flex border-b border-slate-800 gap-2">
+        <button
+          onClick={() => setActiveTab("query")}
+          className={`flex items-center gap-2 px-4 py-2.5 font-medium text-sm border-b-2 transition-colors ${
+            activeTab === "query"
+              ? "border-cyan-400 text-cyan-400 bg-cyan-500/5"
+              : "border-transparent text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          <HelpCircle className="w-4 h-4" />
+          Natural-Language Question
+        </button>
+        <button
+          onClick={() => setActiveTab("visualize")}
+          className={`flex items-center gap-2 px-4 py-2.5 font-medium text-sm border-b-2 transition-colors ${
+            activeTab === "visualize"
+              ? "border-cyan-400 text-cyan-400 bg-cyan-500/5"
+              : "border-transparent text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          <BarChart3 className="w-4 h-4" />
+          Prompt-to-Visual
+        </button>
+        <button
+          onClick={() => setActiveTab("insights")}
+          className={`flex items-center gap-2 px-4 py-2.5 font-medium text-sm border-b-2 transition-colors ${
+            activeTab === "insights"
+              ? "border-cyan-400 text-cyan-400 bg-cyan-500/5"
+              : "border-transparent text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          <Lightbulb className="w-4 h-4" />
+          AI Insights
+        </button>
+        <button
+          onClick={() => setActiveTab("explain")}
+          className={`flex items-center gap-2 px-4 py-2.5 font-medium text-sm border-b-2 transition-colors ${
+            activeTab === "explain"
+              ? "border-cyan-400 text-cyan-400 bg-cyan-500/5"
+              : "border-transparent text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          <Sparkles className="w-4 h-4" />
+          Explain Visual
+        </button>
+      </div>
+
+      {/* Approval Feedback Banner */}
+      {approvalFeedback && (
+        <div className="p-3 bg-emerald-950/40 border border-emerald-500/40 rounded-lg text-emerald-300 text-sm flex items-center justify-between">
+          <span>{approvalFeedback}</span>
+          <button onClick={() => setApprovalFeedback(null)} className="text-emerald-400 hover:text-emerald-200">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* TAB 1: Natural Language Question */}
+      {activeTab === "query" && (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-slate-300">
+              Ask a question about your dataset
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                placeholder="e.g. What is total revenue by category?"
+                disabled={!isAIEnabled || queryLoading}
+                className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+              />
+              <button
+                onClick={() => handleAskQuestion()}
+                disabled={!isAIEnabled || queryLoading || !question.trim()}
+                className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-medium rounded-lg text-sm flex items-center gap-2 transition-colors"
+              >
+                {queryLoading ? "Analyzing..." : "Ask AI"}
+              </button>
+            </div>
+            {/* Quick Example Chips */}
+            <div className="flex flex-wrap gap-2 pt-1">
+              <span className="text-xs text-slate-500 self-center">Try:</span>
+              {[
+                "What is revenue by category?",
+                "Show sales by region",
+                "Total orders count",
+              ].map((chip) => (
+                <button
+                  key={chip}
+                  onClick={() => {
+                    setQuestion(chip);
+                    handleAskQuestion(chip);
+                  }}
+                  disabled={!isAIEnabled || queryLoading}
+                  className="text-xs px-2.5 py-1 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-md border border-slate-700 transition-colors disabled:opacity-50"
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {queryError && (
+            <div className="p-3 bg-rose-950/40 border border-rose-500/40 rounded-lg text-rose-300 text-sm">
+              {queryError}
+            </div>
+          )}
+
+          {queryResult && (
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-semibold text-slate-100 text-base">Answer</h3>
+                  <p className="text-sm text-slate-300 mt-1">{queryResult.summary_answer}</p>
+                </div>
+                {/* User Approval Controls */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleApprove(queryResult.visual_suggestion)}
+                    className="px-3 py-1.5 bg-emerald-600/80 hover:bg-emerald-500 text-white text-xs font-semibold rounded-md flex items-center gap-1 transition-colors"
+                  >
+                    <Check className="w-3.5 h-3.5" /> Approve
+                  </button>
+                  <button
+                    onClick={handleReject}
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-md flex items-center gap-1 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" /> Reject
+                  </button>
+                </div>
+              </div>
+
+              {/* Analytics Result Chart Preview */}
+              {queryResult.analytics_result && queryResult.visual_suggestion && (
+                <div className="border border-slate-800 rounded-lg p-4 bg-slate-900">
+                  <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+                    Validated Analytical Output ({queryResult.visual_suggestion.chart_type})
+                  </h4>
+                  <VisualizationChart
+                    spec={{
+                      chart_type: queryResult.visual_suggestion.chart_type,
+                      title: queryResult.visual_suggestion.title,
+                      dimensions: queryResult.query_intent.dimensions,
+                      measures: queryResult.query_intent.measures,
+                      kpi_measure: queryResult.visual_suggestion.kpi_measure,
+                    } as any}
+                    queryResponse={queryResult.analytics_result as any}
+                  />
+
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 2: Prompt-to-Visual */}
+      {activeTab === "visualize" && (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-slate-300">
+              Describe the chart you want to build
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={visPrompt}
+                onChange={(e) => setVisPrompt(e.target.value)}
+                placeholder="e.g. Show sales by category as a bar chart"
+                disabled={!isAIEnabled || visLoading || !datasetId}
+                className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+              />
+              <button
+                onClick={handleGenerateVis}
+                disabled={!isAIEnabled || visLoading || !visPrompt.trim() || !datasetId}
+                className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-medium rounded-lg text-sm flex items-center gap-2 transition-colors"
+              >
+                {visLoading ? "Generating..." : "Generate Chart"}
+              </button>
+            </div>
+          </div>
+
+          {visError && (
+            <div className="p-3 bg-rose-950/40 border border-rose-500/40 rounded-lg text-rose-300 text-sm">
+              {visError}
+            </div>
+          )}
+
+          {visResult && (
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded font-semibold ${
+                      visResult.is_valid
+                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                        : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
+                    }`}
+                  >
+                    {visResult.is_valid ? "Validated KaanViz Spec" : "Spec Validation Issues"}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-200">
+                    {visResult.suggestion.title || "AI Suggested Visual"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleApprove(visResult.suggestion)}
+                    className="px-3 py-1.5 bg-emerald-600/80 hover:bg-emerald-500 text-white text-xs font-semibold rounded-md flex items-center gap-1"
+                  >
+                    <Check className="w-3.5 h-3.5" /> Approve & Apply
+                  </button>
+                  <button
+                    onClick={handleReject}
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-md flex items-center gap-1"
+                  >
+                    <X className="w-3.5 h-3.5" /> Reject
+                  </button>
+                </div>
+              </div>
+
+              {visResult.suggestion.explanation && (
+                <p className="text-sm text-slate-300">{visResult.suggestion.explanation}</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: AI Insights */}
+      {activeTab === "insights" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-slate-300">
+              Generate structured AI insights grounded in deterministic dataset profiling.
+            </p>
+            <button
+              onClick={handleGetInsights}
+              disabled={!isAIEnabled || insightsLoading || !datasetId}
+              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-medium rounded-lg text-sm transition-colors"
+            >
+              {insightsLoading ? "Analyzing..." : "Generate Insights"}
+            </button>
+          </div>
+
+          {insightsError && (
+            <div className="p-3 bg-rose-950/40 border border-rose-500/40 rounded-lg text-rose-300 text-sm">
+              {insightsError}
+            </div>
+          )}
+
+          {insights.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {insights.map((ins, i) => (
+                <div key={i} className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 font-semibold border border-cyan-500/20 uppercase">
+                      {ins.type}
+                    </span>
+                  </div>
+                  <h4 className="font-semibold text-slate-100 text-base">{ins.title}</h4>
+                  <p className="text-sm text-slate-300">{ins.summary}</p>
+                  {ins.evidence && ins.evidence.length > 0 && (
+                    <div className="space-y-1 pt-1">
+                      <span className="text-xs font-semibold text-slate-400">Grounded Evidence:</span>
+                      <ul className="list-disc list-inside text-xs text-slate-400 space-y-0.5">
+                        {ins.evidence.map((ev, ei) => (
+                          <li key={ei}>{ev}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 4: Explain Visual */}
+      {activeTab === "explain" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-slate-300">
+              Get a detailed structured explanation of what your visual shows, observed patterns, and limitations.
+            </p>
+            <button
+              onClick={handleExplainVisual}
+              disabled={!isAIEnabled || explainLoading || !datasetId}
+              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-medium rounded-lg text-sm transition-colors"
+            >
+              {explainLoading ? "Explaining..." : "Explain Selected Visual"}
+            </button>
+          </div>
+
+          {explainError && (
+            <div className="p-3 bg-rose-950/40 border border-rose-500/40 rounded-lg text-rose-300 text-sm">
+              {explainError}
+            </div>
+          )}
+
+          {explainResult && (
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
+              <h3 className="text-lg font-bold text-slate-100">{explainResult.title}</h3>
+
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold text-cyan-400">What This Visual Shows</h4>
+                <p className="text-sm text-slate-300">{explainResult.what_visual_shows}</p>
+              </div>
+
+              {explainResult.observed_patterns && explainResult.observed_patterns.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-semibold text-emerald-400">Observed Patterns</h4>
+                  <ul className="list-disc list-inside text-sm text-slate-300 space-y-1">
+                    {explainResult.observed_patterns.map((pt, pi) => (
+                      <li key={pi}>{pt}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {explainResult.limitations_and_context && explainResult.limitations_and_context.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-semibold text-amber-400">Limitations & Context</h4>
+                  <ul className="list-disc list-inside text-sm text-slate-300 space-y-1">
+                    {explainResult.limitations_and_context.map((lm, li) => (
+                      <li key={li}>{lm}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

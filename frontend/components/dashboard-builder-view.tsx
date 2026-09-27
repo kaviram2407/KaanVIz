@@ -34,7 +34,11 @@ import {
   RefreshCw,
   Sliders,
   CheckCircle,
+  Bot,
 } from "lucide-react";
+import { AIAnalystPanel } from "@/components/ai-analyst-panel";
+import { AIVisualizationSuggestion } from "@/lib/ai-api";
+
 
 export function DashboardBuilderView() {
   const [dashboards, setDashboards] = useState<DashboardItemSummaryResponse[]>([]);
@@ -56,9 +60,42 @@ export function DashboardBuilderView() {
 
   // Power BI-Style Side Panel & Canvas Selection
   const [isAuthoringPanelOpen, setIsAuthoringPanelOpen] = useState<boolean>(true);
+  const [showAiPanel, setShowAiPanel] = useState<boolean>(false);
   const [selectedWidgetId, setSelectedWidgetId] = useState<string | null>(null);
   const [panelDatasetId, setPanelDatasetId] = useState<string>("");
   const [panelDatasetProfile, setPanelDatasetProfile] = useState<DatasetProfileResponse | null>(null);
+
+  const handleApproveAiVisual = async (suggestion: AIVisualizationSuggestion) => {
+    if (!currentDashboard) return;
+    const targetDsId = panelDatasetId || (datasets.length > 0 ? datasets[0].id : null);
+    if (!targetDsId) return;
+
+    try {
+      setIsSaving(true);
+      setError(null);
+      const itemCount = currentDashboard.items.length;
+      const newItem = await addDashboardItem(currentDashboard.id, {
+        title: suggestion.title || "AI Generated Visual",
+        visualization_spec: {
+          chart_type: suggestion.chart_type,
+          title: suggestion.title,
+          dimensions: suggestion.dimensions,
+          measures: suggestion.measures,
+          kpi_measure: suggestion.kpi_measure,
+        } as any,
+        dataset_id: targetDsId,
+        layout: { x: (itemCount % 2) * 6, y: Math.floor(itemCount / 2) * 4, w: 6, h: 4 },
+      });
+      setSuccessMsg("AI Suggestion approved and added to dashboard!");
+      setSelectedWidgetId(newItem.id);
+      await loadDashboard(currentDashboard.id);
+    } catch (err: any) {
+      setError(err.message || "Failed to add AI suggestion to dashboard");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
 
   // Modals
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
@@ -591,6 +628,19 @@ export function DashboardBuilderView() {
               </button>
             </div>
 
+            <button
+              onClick={() => setShowAiPanel(!showAiPanel)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-xs font-semibold transition-colors ${
+                showAiPanel
+                  ? "bg-cyan-600 border-cyan-500 text-white"
+                  : "bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
+              }`}
+            >
+              <Bot className="w-3.5 h-3.5 text-cyan-400" />
+              AI Analyst
+            </button>
+
+
             {isEditing && (
               <>
                 <button
@@ -647,7 +697,19 @@ export function DashboardBuilderView() {
           </div>
         )}
 
+        {/* AI Analyst Section */}
+        {showAiPanel && (
+          <div className="mb-4">
+            <AIAnalystPanel
+              datasetId={panelDatasetId || (datasets.length > 0 ? datasets[0].id : undefined)}
+              dashboardId={selectedDashboardId}
+              onApproveVisual={handleApproveAiVisual}
+            />
+          </div>
+        )}
+
         {/* Global Dashboard Filter Bar */}
+
         <div className="p-4 bg-slate-900/80 border border-slate-800 rounded-xl space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-2">
             <span className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
