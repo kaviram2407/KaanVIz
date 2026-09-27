@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
-from sqlalchemy import String, Integer, DateTime, ForeignKey, Text, JSON
+from sqlalchemy import String, Integer, Float, Boolean, DateTime, ForeignKey, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -61,6 +61,8 @@ class Dataset(Base):
     workspace: Mapped["Workspace"] = relationship("Workspace", back_populates="datasets")
     data_source: Mapped[Optional["DataSource"]] = relationship("DataSource", back_populates="datasets")
     versions: Mapped[list["DatasetVersion"]] = relationship("DatasetVersion", back_populates="dataset", cascade="all, delete-orphan")
+    profiles: Mapped[list["DatasetProfile"]] = relationship("DatasetProfile", back_populates="dataset", cascade="all, delete-orphan")
+    columns: Mapped[list["DatasetColumn"]] = relationship("DatasetColumn", back_populates="dataset", cascade="all, delete-orphan")
 
 
 class DatasetVersion(Base):
@@ -78,3 +80,50 @@ class DatasetVersion(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     dataset: Mapped["Dataset"] = relationship("Dataset", back_populates="versions")
+    profiles: Mapped[list["DatasetProfile"]] = relationship("DatasetProfile", back_populates="dataset_version", cascade="all, delete-orphan")
+    columns: Mapped[list["DatasetColumn"]] = relationship("DatasetColumn", back_populates="dataset_version", cascade="all, delete-orphan")
+
+
+class DatasetProfile(Base):
+    __tablename__ = "dataset_profiles"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    dataset_id: Mapped[str] = mapped_column(String(36), ForeignKey("datasets.id", ondelete="CASCADE"), nullable=False)
+    dataset_version_id: Mapped[str] = mapped_column(String(36), ForeignKey("dataset_versions.id", ondelete="CASCADE"), nullable=False)
+    row_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    column_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    file_size_bytes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    duplicate_rows: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    missing_cells: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    missing_percentage: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    quality_score: Mapped[float] = mapped_column(Float, nullable=False, default=100.0)
+    summary_metadata: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    status: Mapped[str] = mapped_column(String(50), nullable=False, default="completed")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    dataset: Mapped["Dataset"] = relationship("Dataset", back_populates="profiles")
+    dataset_version: Mapped["DatasetVersion"] = relationship("DatasetVersion", back_populates="profiles")
+
+
+class DatasetColumn(Base):
+    __tablename__ = "dataset_columns"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    dataset_id: Mapped[str] = mapped_column(String(36), ForeignKey("datasets.id", ondelete="CASCADE"), nullable=False)
+    dataset_version_id: Mapped[str] = mapped_column(String(36), ForeignKey("dataset_versions.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    ordinal_position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    physical_type: Mapped[str] = mapped_column(String(50), nullable=False, default="VARCHAR")
+    semantic_type: Mapped[str] = mapped_column(String(50), nullable=False, default="Text")
+    type_source: Mapped[str] = mapped_column(String(50), nullable=False, default="inferred")
+    null_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    null_percentage: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    distinct_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    is_unique: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    stats: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    dataset: Mapped["Dataset"] = relationship("Dataset", back_populates="columns")
+    dataset_version: Mapped["DatasetVersion"] = relationship("DatasetVersion", back_populates="columns")

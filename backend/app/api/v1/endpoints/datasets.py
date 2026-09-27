@@ -1,15 +1,23 @@
 import logging
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
-from app.models.dataset import Dataset, DatasetVersion, DataSource
-from app.schemas.dataset import DatasetUploadResponse, DatasetListResponse, DatasetItem
+from app.models.dataset import Workspace, DataSource, Dataset, DatasetVersion, DatasetProfile, DatasetColumn
+from app.schemas.dataset import (
+    DatasetUploadResponse,
+    DatasetItem,
+    DatasetListResponse,
+    DatasetProfileResponse,
+    DatasetProfileSummary,
+    ColumnProfileItem
+)
 from app.services.ingestion_service import CSVIngestionService, DEFAULT_WORKSPACE_ID
+from app.services.profiling_service import ProfilingService
 
 router = APIRouter()
-logger = logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def get_db():
@@ -24,22 +32,22 @@ def get_db():
     "/workspaces/{workspace_id}/datasets/upload",
     response_model=DatasetUploadResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Upload and register a raw CSV dataset"
+    summary="Upload CSV Dataset"
 )
-async def upload_dataset_in_workspace(
+def upload_dataset_in_workspace(
     workspace_id: str,
     file: UploadFile = File(...),
     name: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
-    if not file.filename:
+    if not file or not file.filename:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error": {"code": "MISSING_FILENAME", "message": "No file uploaded."}}
+            detail={"error": {"code": "MISSING_FILE", "message": "No file payload provided in upload request."}}
         )
 
     try:
-        content = await file.read()
+        content = file.file.read()
         service = CSVIngestionService(db)
         dataset = service.ingest_csv(
             file_bytes=content,
@@ -68,16 +76,17 @@ async def upload_dataset_in_workspace(
             created_at=dataset.created_at
         )
 
-    except ValueError as e:
+    except ValueError as ve:
+        logger.warning(f"Dataset upload validation error: {ve}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"error": {"code": "INVALID_FILE", "message": str(e)}}
+            detail={"error": {"code": "INVALID_FILE", "message": str(ve)}}
         )
     except Exception as e:
-        logger.error(f"Unexpected upload failure: {e}", exc_info=True)
+        logger.error(f"Unexpected dataset upload failure: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error": {"code": "INGESTION_ERROR", "message": "An error occurred during dataset ingestion."}}
+            detail={"error": {"code": "INGESTION_ERROR", "message": "Failed to process and register dataset."}}
         )
 
 
@@ -85,14 +94,14 @@ async def upload_dataset_in_workspace(
     "/datasets/upload",
     response_model=DatasetUploadResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Upload and register a CSV dataset (Default Workspace)"
+    summary="Upload CSV Dataset (Default Workspace)"
 )
-async def upload_dataset_default(
+def upload_dataset_default(
     file: UploadFile = File(...),
     name: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
-    return await upload_dataset_in_workspace(
+    return upload_dataset_in_workspace(
         workspace_id=DEFAULT_WORKSPACE_ID,
         file=file,
         name=name,
@@ -103,40 +112,39 @@ async def upload_dataset_default(
 @router.get(
     "/workspaces/{workspace_id}/datasets",
     response_model=DatasetListResponse,
-    summary="List datasets in a workspace"
+    summary="List workspace datasets"
 )
 def list_workspace_datasets(workspace_id: str, db: Session = Depends(get_db)):
     datasets = db.query(Dataset).filter(Dataset.workspace_id == workspace_id).order_by(Dataset.created_at.desc()).all()
-    items = []
-    for d in datasets:
-        version = db.query(DatasetVersion).filter(DatasetVersion.id == d.current_version_id).first()
-        source = db.query(DataSource).filter(DataSource.id == d.data_source_id).first()
-        
-        orig_name = source.configuration.get("original_filename", d.name) if source else d.name
+    items: List[DatasetItem] = []
+
+    for ds in datasets:
+        version = db.query(DatasetVersion).filter(DatasetVersion.id == ds.current_version_id).first()
+        source = db.query(DataSource).filter(DataSource.id == ds.data_source_id).first()
+        orig_name = source.configuration.get("original_filename", ds.name) if source else ds.name
         file_size = source.configuration.get("file_size_bytes", 0) if source else 0
 
-        items.append(
-            DatasetItem(
-                id=d.id,
-                workspace_id=d.workspace_id,
-                data_source_id=d.data_source_id,
-                name=d.name,
-                status=d.status,
-                original_filename=orig_name,
-                file_size_bytes=file_size,
-                row_count=version.row_count if version else None,
-                column_count=version.column_count if version else None,
-                created_at=d.created_at,
-                updated_at=d.updated_at
-            )
-        )
+        items.append(DatasetItem(
+            id=ds.id,
+            workspace_id=ds.workspace_id,
+            data_source_id=ds.data_source_id,
+            name=ds.name,
+            status=ds.status,
+            original_filename=orig_name,
+            file_size_bytes=file_size,
+            row_count=version.row_count if version else None,
+            column_count=version.column_count if version else None,
+            created_at=ds.created_at,
+            updated_at=ds.updated_at
+        ))
+
     return DatasetListResponse(items=items, total=len(items))
 
 
 @router.get(
     "/datasets",
     response_model=DatasetListResponse,
-    summary="List datasets (Default Workspace)"
+    summary="List default workspace datasets"
 )
 def list_default_datasets(db: Session = Depends(get_db)):
     return list_workspace_datasets(workspace_id=DEFAULT_WORKSPACE_ID, db=db)
@@ -178,3 +186,95 @@ def get_dataset(dataset_id: str, workspace_id: str = DEFAULT_WORKSPACE_ID, db: S
         created_at=dataset.created_at,
         updated_at=dataset.updated_at
     )
+
+
+@router.get(
+    "/datasets/{dataset_id}/profile",
+    response_model=DatasetProfileResponse,
+    summary="Get dataset profile"
+)
+@router.get(
+    "/workspaces/{workspace_id}/datasets/{dataset_id}/profile",
+    response_model=DatasetProfileResponse,
+    summary="Get dataset profile in workspace"
+)
+def get_dataset_profile(dataset_id: str, workspace_id: str = DEFAULT_WORKSPACE_ID, db: Session = Depends(get_db)):
+    dataset = db.query(Dataset).filter(Dataset.workspace_id == workspace_id, Dataset.id == dataset_id).first()
+    if not dataset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "DATASET_NOT_FOUND", "message": "Requested dataset does not exist."}}
+        )
+
+    if not dataset.current_version_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "NO_VERSION", "message": "Dataset has no active version."}}
+        )
+
+    # Fetch existing profile or generate on demand
+    profile = db.query(DatasetProfile).filter(DatasetProfile.dataset_version_id == dataset.current_version_id).first()
+    columns = db.query(DatasetColumn).filter(DatasetColumn.dataset_version_id == dataset.current_version_id).order_by(DatasetColumn.ordinal_position.asc()).all()
+
+    if not profile or not columns:
+        try:
+            profiler = ProfilingService(db)
+            profile, columns = profiler.profile_dataset_version(dataset.id, dataset.current_version_id)
+        except Exception as e:
+            logger.error(f"Failed to calculate dataset profile for {dataset_id}: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail={"error": {"code": "PROFILING_ERROR", "message": f"Failed to compute dataset profile: {str(e)}"}}
+            )
+
+    summary = DatasetProfileSummary.model_validate(profile)
+    col_items = [ColumnProfileItem.model_validate(col) for col in columns]
+
+    return DatasetProfileResponse(
+        dataset_id=dataset.id,
+        workspace_id=dataset.workspace_id,
+        version_id=dataset.current_version_id,
+        dataset_name=dataset.name,
+        summary=summary,
+        columns=col_items
+    )
+
+
+@router.post(
+    "/datasets/{dataset_id}/profile/generate",
+    response_model=DatasetProfileResponse,
+    summary="Generate / re-generate dataset profile"
+)
+@router.post(
+    "/workspaces/{workspace_id}/datasets/{dataset_id}/profile/generate",
+    response_model=DatasetProfileResponse,
+    summary="Generate / re-generate dataset profile in workspace"
+)
+def generate_dataset_profile(dataset_id: str, workspace_id: str = DEFAULT_WORKSPACE_ID, db: Session = Depends(get_db)):
+    dataset = db.query(Dataset).filter(Dataset.workspace_id == workspace_id, Dataset.id == dataset_id).first()
+    if not dataset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "DATASET_NOT_FOUND", "message": "Requested dataset does not exist."}}
+        )
+
+    try:
+        profiler = ProfilingService(db)
+        profile, columns = profiler.profile_dataset_version(dataset.id, dataset.current_version_id)
+        summary = DatasetProfileSummary.model_validate(profile)
+        col_items = [ColumnProfileItem.model_validate(col) for col in columns]
+
+        return DatasetProfileResponse(
+            dataset_id=dataset.id,
+            workspace_id=dataset.workspace_id,
+            version_id=dataset.current_version_id or "",
+            dataset_name=dataset.name,
+            summary=summary,
+            columns=col_items
+        )
+    except Exception as e:
+        logger.error(f"Failed to generate dataset profile for {dataset_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "PROFILING_ERROR", "message": f"Failed to generate profile: {str(e)}"}}
+        )

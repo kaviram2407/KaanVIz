@@ -1,17 +1,19 @@
 "use client";
 
 import React from "react";
-import { Database, FileSpreadsheet, Calendar, HardDrive } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Database, FileSpreadsheet, Calendar, HardDrive, BarChart2 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { DatasetItem } from "@/lib/api-client";
 
 interface DatasetListProps {
   datasets: DatasetItem[];
   isLoading?: boolean;
+  onSelectDataset?: (dataset: DatasetItem) => void;
 }
 
-export function DatasetList({ datasets, isLoading }: DatasetListProps) {
+export function DatasetList({ datasets, isLoading, onSelectDataset }: DatasetListProps) {
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -35,16 +37,22 @@ export function DatasetList({ datasets, isLoading }: DatasetListProps) {
   return (
     <div className="space-y-3" data-testid="dataset-catalog-list">
       {datasets.map((ds) => (
-        <Card key={ds.id} className="bg-slate-900/60 border-slate-800 hover:border-slate-700 transition-colors">
+        <Card
+          key={ds.id}
+          className="bg-slate-900/60 border-slate-800 hover:border-slate-700 transition-colors cursor-pointer group"
+          onClick={() => onSelectDataset && onSelectDataset(ds)}
+        >
           <CardContent className="p-4 flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <div className="p-2 bg-indigo-950/60 border border-indigo-500/20 rounded-lg text-indigo-400">
+              <div className="p-2 bg-indigo-950/60 border border-indigo-500/20 rounded-lg text-indigo-400 group-hover:scale-105 transition-transform">
                 <FileSpreadsheet className="h-5 w-5" />
               </div>
 
               <div>
                 <div className="flex items-center space-x-2">
-                  <h4 className="font-semibold text-slate-100 text-sm">{ds.name}</h4>
+                  <h4 className="font-semibold text-slate-100 text-sm group-hover:text-indigo-400 transition-colors">
+                    {ds.name}
+                  </h4>
                   <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 text-[10px] uppercase">
                     {ds.status}
                   </Badge>
@@ -62,11 +70,26 @@ export function DatasetList({ datasets, isLoading }: DatasetListProps) {
               </div>
             </div>
 
-            <div className="text-right text-xs">
-              <div className="font-mono text-slate-200 font-medium">
-                {ds.row_count ?? 0} rows × {ds.column_count ?? 0} cols
+            <div className="flex items-center space-x-4">
+              <div className="text-right text-xs">
+                <div className="font-mono text-slate-200 font-medium">
+                  {ds.row_count ?? 0} rows × {ds.column_count ?? 0} cols
+                </div>
+                <span className="text-[10px] text-slate-500">Raw Immutable CSV</span>
               </div>
-              <span className="text-[10px] text-slate-500">Raw Immutable CSV</span>
+
+              <Button
+                variant="outline"
+                size="sm"
+                data-testid={`open-profile-btn-${ds.id}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onSelectDataset) onSelectDataset(ds);
+                }}
+                className="border-slate-700 text-slate-300 hover:bg-slate-800 text-xs"
+              >
+                <BarChart2 className="h-3.5 w-3.5 mr-1" /> Profile
+              </Button>
             </div>
           </CardContent>
         </Card>

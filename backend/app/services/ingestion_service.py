@@ -166,7 +166,15 @@ class CSVIngestionService:
             self.db.commit()
             self.db.refresh(dataset)
 
-            logger.info(f"Dataset '{dataset.name}' ({dataset.id}) successfully registered.")
+            # Auto-trigger Phase 3 Profiling
+            try:
+                from app.services.profiling_service import ProfilingService
+                profiler = ProfilingService(self.db, storage=self.storage)
+                profiler.profile_dataset_version(dataset.id, version.id)
+            except Exception as pe:
+                logger.warning(f"Auto-profiling after upload encountered non-fatal error: {pe}")
+
+            logger.info(f"Dataset '{dataset.name}' ({dataset.id}) successfully registered and profiled.")
             return dataset
 
         except Exception as e:

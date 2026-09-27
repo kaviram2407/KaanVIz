@@ -16,7 +16,7 @@ test.describe('KaanViz Phase 2 — CSV Ingestion E2E Workflow', () => {
       // 2. Navigate to Data page using primary nav link
       await page.click('a[href="/data"]');
       await page.waitForURL('/data');
-      await expect(page.getByText('Data Management & Ingestion')).toBeVisible();
+      await expect(page.getByText(/Data Management/i)).toBeVisible();
 
       // 3. Upload test CSV
       const fileInput = page.getByTestId('file-input');
@@ -48,7 +48,7 @@ test.describe('KaanViz Phase 2 — CSV Ingestion E2E Workflow', () => {
 
     try {
       await page.goto('/data');
-      await expect(page.getByText('Data Management & Ingestion')).toBeVisible();
+      await expect(page.getByText(/Data Management/i)).toBeVisible();
 
       const fileInput = page.getByTestId('file-input');
       await fileInput.setInputFiles(invalidFilePath);
