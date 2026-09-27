@@ -1,0 +1,85 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: kaanviz-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kaanviz}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kaanviz_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-kaanviz_db}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kaanviz} -d ${POSTGRES_DB:-kaanviz_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: kaanviz-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: kaanviz-backend
+    restart: unless-stopped
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    environment:
+      - APP_ENV=${APP_ENV:-development}
+      - DEBUG=${DEBUG:-true}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-kaanviz}:${POSTGRES_PASSWORD:-kaanviz_dev_password}@postgres:5432/${POSTGRES_DB:-kaanviz_db}
+      - REDIS_URL=redis://redis:6379/0
+      - STORAGE_BASE_PATH=/app/storage
+      - STORAGE_RAW_PATH=/app/storage/raw
+      - STORAGE_PROCESSED_PATH=/app/storage/processed
+      - STORAGE_METADATA_PATH=/app/storage/metadata
+      - STORAGE_EXPORTS_PATH=/app/storage/exports
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
+      - AI_ENABLED=${AI_ENABLED:-false}
+    volumes:
+      - ./backend:/app
+      - ./storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/v1/health\")'"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: kaanviz-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
