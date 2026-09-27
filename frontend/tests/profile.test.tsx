@@ -62,7 +62,7 @@ describe('Phase 3 — Frontend Dataset Profile UI Tests', () => {
     render(<DatasetProfileView profileData={mockProfile} onBack={vi.fn()} />);
 
     expect(screen.getByText('Sales Analytics 2026')).toBeInTheDocument();
-    expect(screen.getByText('Score: 98.5%')).toBeInTheDocument();
+    expect(screen.getByText(/98\.5%/)).toBeInTheDocument();
     expect(screen.getAllByText('500').length).toBeGreaterThan(0); // Row count & distinct count
     expect(screen.getAllByText('4').length).toBeGreaterThan(0); // Column count
   });

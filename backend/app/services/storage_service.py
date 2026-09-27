@@ -26,6 +26,11 @@ class StorageProvider(ABC):
         pass
 
     @abstractmethod
+    def save_processed_file(self, content: bytes, dataset_id: str, version_id: str) -> tuple[str, str, int]:
+        """Saves processed/prepared file content and returns (storage_key, storage_path, file_size_bytes)."""
+        pass
+
+    @abstractmethod
     def get_file_bytes(self, storage_path: str) -> bytes:
         """Retrieves file bytes from storage."""
         pass
@@ -63,6 +68,24 @@ class LocalStorageProvider(StorageProvider):
         rel_path = os.path.relpath(target_path, start=self.storage_base_dir)
         logger.info(f"Successfully stored raw immutable dataset: {storage_key} ({file_size} bytes)")
         return storage_key, rel_path, file_size
+
+    def save_processed_file(self, content: bytes, dataset_id: str, version_id: str) -> tuple[str, str, int]:
+        processed_dir = os.path.abspath(os.path.join(self.storage_base_dir, "processed"))
+        os.makedirs(processed_dir, exist_ok=True)
+        storage_key = f"proc_{dataset_id[:8]}_{version_id[:8]}.csv"
+        target_path = os.path.abspath(os.path.join(processed_dir, storage_key))
+
+        if not target_path.startswith(processed_dir):
+            raise ValueError("Invalid storage path: Path traversal prohibited.")
+
+        with open(target_path, "wb") as f:
+            f.write(content)
+
+        file_size = len(content)
+        rel_path = os.path.relpath(target_path, start=self.storage_base_dir)
+        logger.info(f"Successfully stored prepared dataset version: {storage_key} ({file_size} bytes)")
+        return storage_key, rel_path, file_size
+
 
     def get_file_bytes(self, storage_path: str) -> bytes:
         full_path = os.path.abspath(os.path.join(self.storage_base_dir, storage_path))

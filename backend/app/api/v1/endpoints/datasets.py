@@ -278,3 +278,163 @@ def generate_dataset_profile(dataset_id: str, workspace_id: str = DEFAULT_WORKSP
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error": {"code": "PROFILING_ERROR", "message": f"Failed to generate profile: {str(e)}"}}
         )
+
+
+# Phase 4 Preparation & Transformation Endpoints
+
+from app.schemas.dataset import (
+    PrepareDatasetRequest,
+    PreparedDatasetResponse,
+    TransformationHistoryResponse,
+    TransformationItem,
+    ValidateDatasetRequest,
+    ValidateDatasetResponse,
+    ValidationIssueItem
+)
+from app.services.preparation_service import PreparationService
+from app.models.dataset import Transformation
+
+
+@router.post(
+    "/datasets/{dataset_id}/prepare",
+    response_model=PreparedDatasetResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Prepare / clean dataset version"
+)
+@router.post(
+    "/workspaces/{workspace_id}/datasets/{dataset_id}/prepare",
+    response_model=PreparedDatasetResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Prepare / clean dataset version in workspace"
+)
+def prepare_dataset_endpoint(
+    dataset_id: str,
+    req: PrepareDatasetRequest,
+    workspace_id: str = DEFAULT_WORKSPACE_ID,
+    db: Session = Depends(get_db)
+):
+    dataset = db.query(Dataset).filter(Dataset.workspace_id == workspace_id, Dataset.id == dataset_id).first()
+    if not dataset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "DATASET_NOT_FOUND", "message": "Requested dataset does not exist."}}
+        )
+
+    if not req.operations or len(req.operations) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "INVALID_OPERATIONS", "message": "At least one preparation operation must be provided."}}
+        )
+
+    try:
+        prep_service = PreparationService(db)
+        prep_ver, metrics, transformations = prep_service.prepare_dataset(
+            dataset_id=dataset.id,
+            operations=req.operations,
+            source_version_id=req.source_version_id
+        )
+
+        return PreparedDatasetResponse(
+            dataset_id=dataset.id,
+            workspace_id=dataset.workspace_id,
+            source_version_id=prep_ver.parent_version_id or "",
+            prepared_version_id=prep_ver.id,
+            version_number=prep_ver.version_number,
+            metrics_comparison=metrics,
+            created_at=prep_ver.created_at
+        )
+    except ValueError as ve:
+        logger.warning(f"Preparation operation validation error for dataset {dataset_id}: {ve}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "PREPARATION_ERROR", "message": str(ve)}}
+        )
+    except KeyError as ke:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "RESOURCE_NOT_FOUND", "message": str(ke)}}
+        )
+    except Exception as e:
+        logger.error(f"Unexpected dataset preparation failure: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "PREPARATION_FAILED", "message": f"Failed to execute preparation operations: {str(e)}"}}
+        )
+
+
+@router.get(
+    "/datasets/{dataset_id}/transformations",
+    response_model=TransformationHistoryResponse,
+    summary="Get dataset transformation history / lineage"
+)
+@router.get(
+    "/workspaces/{workspace_id}/datasets/{dataset_id}/transformations",
+    response_model=TransformationHistoryResponse,
+    summary="Get dataset transformation history in workspace"
+)
+def get_dataset_transformations(
+    dataset_id: str,
+    workspace_id: str = DEFAULT_WORKSPACE_ID,
+    db: Session = Depends(get_db)
+):
+    dataset = db.query(Dataset).filter(Dataset.workspace_id == workspace_id, Dataset.id == dataset_id).first()
+    if not dataset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "DATASET_NOT_FOUND", "message": "Requested dataset does not exist."}}
+        )
+
+    tr_records = db.query(Transformation).filter(Transformation.dataset_id == dataset.id).order_by(Transformation.created_at.asc()).all()
+    items = [TransformationItem.model_validate(tr) for tr in tr_records]
+
+    return TransformationHistoryResponse(
+        dataset_id=dataset.id,
+        transformations=items,
+        total=len(items)
+    )
+
+
+@router.post(
+    "/datasets/{dataset_id}/validate",
+    response_model=ValidateDatasetResponse,
+    summary="Validate dataset version and preparation operations"
+)
+@router.post(
+    "/workspaces/{workspace_id}/datasets/{dataset_id}/validate",
+    response_model=ValidateDatasetResponse,
+    summary="Validate dataset version and operations in workspace"
+)
+def validate_dataset_endpoint(
+    dataset_id: str,
+    req: ValidateDatasetRequest,
+    workspace_id: str = DEFAULT_WORKSPACE_ID,
+    db: Session = Depends(get_db)
+):
+    dataset = db.query(Dataset).filter(Dataset.workspace_id == workspace_id, Dataset.id == dataset_id).first()
+    if not dataset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "DATASET_NOT_FOUND", "message": "Requested dataset does not exist."}}
+        )
+
+    target_ver_id = req.version_id or dataset.current_version_id
+    version = db.query(DatasetVersion).filter(DatasetVersion.id == target_ver_id).first()
+    if not version:
+        return ValidateDatasetResponse(
+            status="invalid",
+            issues=[ValidationIssueItem(code="NO_VERSION", message="Dataset version not found.")]
+        )
+
+    issues: List[ValidationIssueItem] = []
+
+    # Validate operations if provided
+    if req.operations:
+        for idx, op in enumerate(req.operations):
+            if op.operation_type not in ("fill_missing", "remove_duplicates", "convert_type", "text_normalization", "column_operation", "date_transform"):
+                issues.append(ValidationIssueItem(code="INVALID_OPERATION_TYPE", message=f"Unsupported operation type '{op.operation_type}' at index {idx}."))
+
+    return ValidateDatasetResponse(
+        status="valid" if len(issues) == 0 else "invalid",
+        issues=issues
+    )
+

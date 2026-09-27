@@ -127,3 +127,23 @@ class DatasetColumn(Base):
 
     dataset: Mapped["Dataset"] = relationship("Dataset", back_populates="columns")
     dataset_version: Mapped["DatasetVersion"] = relationship("DatasetVersion", back_populates="columns")
+
+
+class Transformation(Base):
+    __tablename__ = "transformations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id: Mapped[str] = mapped_column(String(36), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    dataset_id: Mapped[str] = mapped_column(String(36), ForeignKey("datasets.id", ondelete="CASCADE"), nullable=False)
+    source_version_id: Mapped[str] = mapped_column(String(36), ForeignKey("dataset_versions.id", ondelete="CASCADE"), nullable=False)
+    target_version_id: Mapped[str] = mapped_column(String(36), ForeignKey("dataset_versions.id", ondelete="CASCADE"), nullable=False)
+    operation_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    operation_spec: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    execution_status: Mapped[str] = mapped_column(String(50), nullable=False, default="completed")
+    execution_metadata: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    dataset: Mapped["Dataset"] = relationship("Dataset", foreign_keys=[dataset_id])
+    source_version: Mapped["DatasetVersion"] = relationship("DatasetVersion", foreign_keys=[source_version_id])
+    target_version: Mapped["DatasetVersion"] = relationship("DatasetVersion", foreign_keys=[target_version_id])
+
