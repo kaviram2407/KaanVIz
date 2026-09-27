@@ -61,6 +61,16 @@ class AnalyticsQueryResponse(BaseModel):
     execution_time_ms: float
 
 
+class SimpleMeasure(BaseModel):
+    field: str = Field(..., description="Target column name")
+    aggregation: str = Field(
+        ...,
+        description="Aggregation: 'sum', 'avg', 'count', 'distinct_count', 'min', 'max'"
+    )
+    display_name: Optional[str] = Field(None, description="Display title for the measure")
+    format: Optional[str] = Field("number", description="Formatting style: 'number', 'currency', 'percentage'")
+
+
 class VisualizationSpec(BaseModel):
     chart_type: str = Field(
         ...,
@@ -69,6 +79,7 @@ class VisualizationSpec(BaseModel):
     title: Optional[str] = Field(None, description="Chart title")
     dimensions: List[DimensionSpec] = Field(default_factory=list)
     measures: List[MeasureSpec] = Field(default_factory=list)
+    kpi_measure: Optional[SimpleMeasure] = Field(None, description="Structured simple measure for KPI/Card visual")
     sort: Optional[SortSpec] = None
     limit: Optional[int] = Field(100, ge=1, le=1000)
 

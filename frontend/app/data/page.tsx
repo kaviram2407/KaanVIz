@@ -167,11 +167,13 @@ export default function DataPage() {
           </span>
         </div>
 
-        <DatasetList
-          datasets={datasets}
-          isLoading={isLoadingCatalog}
-          onSelectDataset={handleSelectDataset}
-        />
+        <div>
+          <DatasetList
+            datasets={datasets}
+            isLoading={isLoadingCatalog}
+            onSelectDataset={handleSelectDataset}
+          />
+        </div>
       </div>
     </div>
   );

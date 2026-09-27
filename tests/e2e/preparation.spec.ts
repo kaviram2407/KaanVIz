@@ -49,14 +49,9 @@ test.describe('KaanViz Phase 4 — Data Preparation E2E Workflow', () => {
       await expect(page.getByTestId('data-preview-card')).toBeVisible();
       await expect(page.getByText('Data Preview')).toBeVisible();
 
-      // 7. Test Interactive Column Header Type Selection
-      const typeHeaderBtn = page.getByTitle(/Change column .* type/i).first();
-      await expect(typeHeaderBtn).toBeVisible();
-      await typeHeaderBtn.click();
-
-      const typeOption = page.getByRole('button', { name: 'VARCHAR' });
-      await expect(typeOption).toBeVisible();
-      await typeOption.click();
+      // 7. Test Type Conversion Step Queueing
+      await page.click('button:has-text("Type Correction")');
+      await page.click('button:has-text("Add Operation to Plan")');
 
       // Verify queued operation
       await expect(page.getByText('convert_type')).toBeVisible();

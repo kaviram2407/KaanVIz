@@ -64,16 +64,27 @@ class AnalyticsService:
             if len(dims) < 1 and len(measures) < 2:
                 issues.append("Scatter chart requires at least 2 numeric measures or 1 dimension + 1 measure.")
         elif chart_type == "kpi":
-            if len(measures) != 1:
+            effective_measures = list(measures)
+            if spec.kpi_measure:
+                effective_measures.append(spec.kpi_measure)
+            if len(effective_measures) != 1:
                 issues.append("KPI visual requires exactly 1 measure.")
             if len(dims) > 0:
                 issues.append("KPI visual does not support dimension grouping.")
         elif chart_type == "table":
-            if len(dims) == 0 and len(measures) == 0:
+            if len(dims) == 0 and len(measures) == 0 and not spec.kpi_measure:
                 issues.append("Table visual requires at least 1 dimension or 1 measure.")
 
+        # Check aggregation validity
+        valid_aggregations = {"sum", "avg", "count", "distinct_count", "min", "max"}
+        for m in measures:
+            if m.aggregation.lower() not in valid_aggregations:
+                issues.append(f"Unsupported aggregation '{m.aggregation}'. Supported aggregations: {', '.join(sorted(valid_aggregations))}.")
+        if spec.kpi_measure and spec.kpi_measure.aggregation.lower() not in valid_aggregations:
+            issues.append(f"Unsupported aggregation '{spec.kpi_measure.aggregation}'. Supported aggregations: {', '.join(sorted(valid_aggregations))}.")
+
         # Check field compatibility if dataset_id provided
-        if dataset_id and (dims or measures):
+        if dataset_id and (dims or measures or spec.kpi_measure):
             dataset = self.db.query(Dataset).filter(Dataset.id == dataset_id).first()
             if not dataset:
                 issues.append(f"Dataset '{dataset_id}' not found.")
@@ -90,7 +101,11 @@ class AnalyticsService:
                     if d.field not in col_map:
                         issues.append(f"Dimension field '{d.field}' does not exist in dataset.")
 
-                for m in measures:
+                check_measures = list(measures)
+                if spec.kpi_measure:
+                    check_measures.append(spec.kpi_measure)
+
+                for m in check_measures:
                     if m.field not in col_map:
                         issues.append(f"Measure field '{m.field}' does not exist in dataset.")
                     else:

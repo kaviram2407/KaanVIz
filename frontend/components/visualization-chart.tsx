@@ -66,12 +66,22 @@ export function VisualizationChart({
   // 1. KPI Metric Visual
   if (chartType === "kpi") {
     const kpiVal = data[0] && primaryMeasure in data[0] ? data[0][primaryMeasure] : 0;
-    const formattedVal =
-      typeof kpiVal === "number"
-        ? kpiVal % 1 === 0
-          ? kpiVal.toLocaleString()
-          : kpiVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-        : String(kpiVal ?? "N/A");
+    const format = spec.kpi_measure?.format || "number";
+    const displayName = spec.kpi_measure?.display_name || spec.title || primaryMeasure || "KPI Metric";
+
+    let formattedVal = String(kpiVal ?? "N/A");
+    if (typeof kpiVal === "number") {
+      if (format === "currency") {
+        formattedVal = `$${kpiVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      } else if (format === "percentage") {
+        formattedVal = `${kpiVal.toFixed(1)}%`;
+      } else {
+        formattedVal =
+          kpiVal % 1 === 0
+            ? kpiVal.toLocaleString()
+            : kpiVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+    }
 
     return (
       <div className="h-80 bg-gradient-to-br from-indigo-950/50 via-slate-900 to-slate-950 border border-indigo-500/30 rounded-xl p-8 flex flex-col items-center justify-center text-center space-y-3 shadow-xl">
@@ -80,7 +90,7 @@ export function VisualizationChart({
         </div>
         <div>
           <span className="text-xs font-semibold text-indigo-300 uppercase tracking-wider block mb-1">
-            {spec.title || primaryMeasure || "KPI Metric"}
+            {displayName}
           </span>
           <div className="text-4xl sm:text-5xl font-extrabold text-slate-100 font-mono tracking-tight">
             {formattedVal}

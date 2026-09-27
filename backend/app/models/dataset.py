@@ -205,3 +205,35 @@ class Relationship(Base):
     target_dataset_version: Mapped["DatasetVersion"] = relationship("DatasetVersion", foreign_keys=[target_dataset_version_id])
 
 
+class Dashboard(Base):
+    __tablename__ = "dashboards"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id: Mapped[str] = mapped_column(String(36), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(50), nullable=False, default="active")
+    filters: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    workspace: Mapped["Workspace"] = relationship("Workspace", foreign_keys=[workspace_id])
+    items: Mapped[list["DashboardItem"]] = relationship("DashboardItem", back_populates="dashboard", cascade="all, delete-orphan")
+
+
+class DashboardItem(Base):
+    __tablename__ = "dashboard_items"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    dashboard_id: Mapped[str] = mapped_column(String(36), ForeignKey("dashboards.id", ondelete="CASCADE"), nullable=False)
+    title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    visualization_spec: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    dataset_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    layout: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    dashboard: Mapped["Dashboard"] = relationship("Dashboard", back_populates="items")
+
+
+
