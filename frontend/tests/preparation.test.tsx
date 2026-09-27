@@ -75,4 +75,30 @@ describe('Phase 4 — Frontend Dataset Preparation UI Tests', () => {
 
     expect(screen.getByText('fill_missing')).toBeInTheDocument();
   });
+
+  it('renders Data Preview section and Before/After toggle bar', () => {
+    render(<DatasetPreparationView profileData={mockProfile} />);
+
+    expect(screen.getByTestId('data-preview-card')).toBeInTheDocument();
+    expect(screen.getByText('Data Preview')).toBeInTheDocument();
+    expect(screen.getByText('Current Data')).toBeInTheDocument();
+    expect(screen.getAllByText('Preview Changes').length).toBeGreaterThan(0);
+  });
+
+  it('enqueues a convert_type operation when selecting a type from interactive column header', () => {
+    render(<DatasetPreparationView profileData={mockProfile} />);
+
+    const headerBtns = screen.getAllByTitle(/Change column .* type/i);
+    expect(headerBtns.length).toBeGreaterThan(0);
+
+    // Open dropdown for first column
+    fireEvent.click(headerBtns[0]);
+
+    // Select VARCHAR or INTEGER option
+    const optionBtn = screen.getByRole('button', { name: 'VARCHAR' });
+    fireEvent.click(optionBtn);
+
+    // Verify convert_type operation appears in plan queue
+    expect(screen.getByText('convert_type')).toBeInTheDocument();
+  });
 });

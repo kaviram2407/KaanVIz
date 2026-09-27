@@ -203,3 +203,47 @@ def test_preparation_formula_and_prompt_injection_safety(db, test_storage):
     prep_bytes = test_storage.get_file_bytes(prep_ver.storage_location)
     assert b"Ignore previous instructions" in prep_bytes
     assert b"=SUM(A1:B2)" in prep_bytes
+
+
+def test_preparation_preview_and_sample(db, test_storage):
+    raw_csv = (
+        b"cust_id,cust_name,score\n"
+        b"10,Alice,100\n"
+        b"20,Bob,\n"
+        b"30,,85\n"
+    )
+
+    ingest_service = CSVIngestionService(db, storage=test_storage)
+    dataset = ingest_service.ingest_csv(
+        file_bytes=raw_csv,
+        original_filename="sample_test.csv",
+        workspace_id="test-workspace"
+    )
+
+    prep_service = PreparationService(db, storage=test_storage)
+
+    # 1. Test get_dataset_sample
+    sample = prep_service.get_dataset_sample(dataset.id, limit=2)
+    assert sample.total_rows == 3
+    assert len(sample.rows) == 2
+    assert len(sample.columns) == 3
+
+    # 2. Test preview_preparation (Dry-run without creating DB version or modifying file)
+    ops = [
+        PreparationOperation(
+            operation_type="fill_missing",
+            target_column="cust_name",
+            params={"strategy": "constant", "fill_value": "Unknown"}
+        )
+    ]
+
+    ver_count_before = len(dataset.versions)
+    preview = prep_service.preview_preparation(dataset.id, ops, limit=10)
+
+    # DB version count remains unchanged
+    assert len(dataset.versions) == ver_count_before
+    assert preview.changed_cells_count == 1
+    assert preview.changed_rows_count == 1
+    assert preview.cell_changes[0].column == "cust_name"
+    assert preview.cell_changes[0].before_value == ""
+    assert preview.cell_changes[0].after_value == "Unknown"

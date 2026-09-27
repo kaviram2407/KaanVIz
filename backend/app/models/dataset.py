@@ -147,3 +147,61 @@ class Transformation(Base):
     source_version: Mapped["DatasetVersion"] = relationship("DatasetVersion", foreign_keys=[source_version_id])
     target_version: Mapped["DatasetVersion"] = relationship("DatasetVersion", foreign_keys=[target_version_id])
 
+
+class DataModel(Base):
+    __tablename__ = "data_models"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id: Mapped[str] = mapped_column(String(36), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False, default="Default Data Model")
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(50), nullable=False, default="active")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    workspace: Mapped["Workspace"] = relationship("Workspace", foreign_keys=[workspace_id])
+    model_datasets: Mapped[list["ModelDataset"]] = relationship("ModelDataset", back_populates="data_model", cascade="all, delete-orphan")
+    relationships: Mapped[list["Relationship"]] = relationship("Relationship", back_populates="data_model", cascade="all, delete-orphan")
+
+
+class ModelDataset(Base):
+    __tablename__ = "model_datasets"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    model_id: Mapped[str] = mapped_column(String(36), ForeignKey("data_models.id", ondelete="CASCADE"), nullable=False)
+    dataset_id: Mapped[str] = mapped_column(String(36), ForeignKey("datasets.id", ondelete="CASCADE"), nullable=False)
+    dataset_version_id: Mapped[str] = mapped_column(String(36), ForeignKey("dataset_versions.id", ondelete="CASCADE"), nullable=False)
+    alias: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    data_model: Mapped["DataModel"] = relationship("DataModel", back_populates="model_datasets")
+    dataset: Mapped["Dataset"] = relationship("Dataset", foreign_keys=[dataset_id])
+    dataset_version: Mapped["DatasetVersion"] = relationship("DatasetVersion", foreign_keys=[dataset_version_id])
+
+
+class Relationship(Base):
+    __tablename__ = "relationships"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id: Mapped[str] = mapped_column(String(36), ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    model_id: Mapped[str] = mapped_column(String(36), ForeignKey("data_models.id", ondelete="CASCADE"), nullable=False)
+    source_dataset_id: Mapped[str] = mapped_column(String(36), ForeignKey("datasets.id", ondelete="CASCADE"), nullable=False)
+    source_dataset_version_id: Mapped[str] = mapped_column(String(36), ForeignKey("dataset_versions.id", ondelete="CASCADE"), nullable=False)
+    source_field: Mapped[str] = mapped_column(String(255), nullable=False)
+    target_dataset_id: Mapped[str] = mapped_column(String(36), ForeignKey("datasets.id", ondelete="CASCADE"), nullable=False)
+    target_dataset_version_id: Mapped[str] = mapped_column(String(36), ForeignKey("dataset_versions.id", ondelete="CASCADE"), nullable=False)
+    target_field: Mapped[str] = mapped_column(String(255), nullable=False)
+    cardinality: Mapped[str] = mapped_column(String(50), nullable=False, default="one_to_many")
+    relationship_type: Mapped[str] = mapped_column(String(50), nullable=False, default="explicit")
+    status: Mapped[str] = mapped_column(String(50), nullable=False, default="approved")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    workspace: Mapped["Workspace"] = relationship("Workspace", foreign_keys=[workspace_id])
+    data_model: Mapped["DataModel"] = relationship("DataModel", back_populates="relationships")
+    source_dataset: Mapped["Dataset"] = relationship("Dataset", foreign_keys=[source_dataset_id])
+    source_dataset_version: Mapped["DatasetVersion"] = relationship("DatasetVersion", foreign_keys=[source_dataset_version_id])
+    target_dataset: Mapped["Dataset"] = relationship("Dataset", foreign_keys=[target_dataset_id])
+    target_dataset_version: Mapped["DatasetVersion"] = relationship("DatasetVersion", foreign_keys=[target_dataset_version_id])
+
+

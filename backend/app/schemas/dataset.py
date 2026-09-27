@@ -153,3 +153,133 @@ class ValidateDatasetResponse(BaseModel):
     status: str  # 'valid' or 'invalid'
     issues: List[ValidationIssueItem]
 
+
+# Phase 5 Data Modeling & Relationship Schemas
+
+class ModelDatasetItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    model_id: str
+    dataset_id: str
+    dataset_version_id: str
+    alias: Optional[str] = None
+    created_at: datetime
+
+
+class RelationshipItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    workspace_id: str
+    model_id: str
+    source_dataset_id: str
+    source_dataset_version_id: str
+    source_field: str
+    target_dataset_id: str
+    target_dataset_version_id: str
+    target_field: str
+    cardinality: str
+    relationship_type: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class DataModelItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    workspace_id: str
+    name: str
+    description: Optional[str] = None
+    status: str
+    datasets_count: int = 0
+    relationships_count: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+
+class DataModelDetailsResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    workspace_id: str
+    name: str
+    description: Optional[str] = None
+    status: str
+    datasets: List[ModelDatasetItem]
+    relationships: List[RelationshipItem]
+    created_at: datetime
+    updated_at: datetime
+
+
+class BindDatasetToModelRequest(BaseModel):
+    dataset_id: str
+    dataset_version_id: Optional[str] = None
+    alias: Optional[str] = None
+
+
+class CreateRelationshipRequest(BaseModel):
+    source_dataset_id: str
+    source_field: str
+    target_dataset_id: str
+    target_field: str
+    cardinality: str = "one_to_many"  # one_to_one, one_to_many, many_to_one, many_to_many
+    source_version_id: Optional[str] = None
+    target_version_id: Optional[str] = None
+
+
+class ValidateRelationshipRequest(BaseModel):
+    source_dataset_id: str
+    source_field: str
+    target_dataset_id: str
+    target_field: str
+    cardinality: str = "one_to_many"
+    source_version_id: Optional[str] = None
+    target_version_id: Optional[str] = None
+
+
+class ValidateRelationshipResponse(BaseModel):
+    is_valid: bool
+    issues: List[str]
+
+
+# Phase 4 Data Preview & Preparation Dry-Run Preview Schemas
+
+class ColumnHeaderItem(BaseModel):
+    name: str
+    physical_type: str
+
+
+class DatasetSampleResponse(BaseModel):
+    dataset_id: str
+    version_id: str
+    total_rows: int
+    limit: int
+    columns: List[ColumnHeaderItem]
+    rows: List[Dict[str, Any]]
+
+
+class CellChangeItem(BaseModel):
+    row_index: int
+    column: str
+    before_value: str
+    after_value: str
+
+
+class PreviewPreparationResponse(BaseModel):
+    dataset_id: str
+    source_version_id: str
+    total_rows_before: int
+    total_rows_after: int
+    preview_limit: int
+    changed_cells_count: int
+    changed_rows_count: int
+    columns_before: List[ColumnHeaderItem]
+    columns_after: List[ColumnHeaderItem]
+    rows_before: List[Dict[str, Any]]
+    rows_after: List[Dict[str, Any]]
+    cell_changes: List[CellChangeItem]
+
+

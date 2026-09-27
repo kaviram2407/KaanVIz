@@ -6,8 +6,15 @@ import pandas as pd
 import numpy as np
 from sqlalchemy.orm import Session
 
-from app.models.dataset import Dataset, DatasetVersion, Transformation
-from app.schemas.dataset import PreparationOperation, PreparedMetricsSummary
+from app.models.dataset import Dataset, DatasetVersion, DatasetColumn, Transformation
+from app.schemas.dataset import (
+    PreparationOperation,
+    PreparedMetricsSummary,
+    ColumnHeaderItem,
+    DatasetSampleResponse,
+    CellChangeItem,
+    PreviewPreparationResponse
+)
 from app.services.storage_service import StorageProvider, get_storage_provider
 from app.services.profiling_service import ProfilingService
 
@@ -340,3 +347,159 @@ class PreparationService:
             self.storage.delete_file(rel_storage_path)
             logger.error(f"Failed to persist prepared version in database: {e}")
             raise RuntimeError(f"Failed to record prepared dataset version: {str(e)}") from e
+
+    def get_dataset_sample(
+        self,
+        dataset_id: str,
+        version_id: Optional[str] = None,
+        limit: int = 20
+    ) -> DatasetSampleResponse:
+        dataset = self.db.query(Dataset).filter(Dataset.id == dataset_id).first()
+        if not dataset:
+            raise KeyError(f"Dataset '{dataset_id}' not found.")
+
+        target_ver_id = version_id or dataset.current_version_id
+        if not target_ver_id:
+            raise ValueError(f"Dataset '{dataset_id}' has no active version to sample.")
+
+        version = self.db.query(DatasetVersion).filter(DatasetVersion.id == target_ver_id).first()
+        if not version:
+            raise KeyError(f"Dataset version '{target_ver_id}' not found.")
+
+        source_bytes = self.storage.get_file_bytes(version.storage_location)
+        text_stream = io.BytesIO(source_bytes)
+        try:
+            df = pd.read_csv(text_stream, encoding="utf-8-sig", dtype=str)
+        except UnicodeDecodeError:
+            text_stream.seek(0)
+            df = pd.read_csv(text_stream, encoding="latin-1", dtype=str)
+
+        total_rows = len(df)
+        sample_df = df.head(limit).fillna("")
+
+        db_cols = self.db.query(DatasetColumn).filter(
+            DatasetColumn.dataset_version_id == version.id
+        ).order_by(DatasetColumn.ordinal_position.asc()).all()
+
+        col_type_map = {c.name: c.physical_type for c in db_cols}
+        columns = [
+            ColumnHeaderItem(
+                name=col_name,
+                physical_type=col_type_map.get(col_name, "VARCHAR")
+            )
+            for col_name in df.columns
+        ]
+
+        rows = sample_df.to_dict(orient="records")
+
+        return DatasetSampleResponse(
+            dataset_id=dataset.id,
+            version_id=version.id,
+            total_rows=total_rows,
+            limit=limit,
+            columns=columns,
+            rows=rows
+        )
+
+    def preview_preparation(
+        self,
+        dataset_id: str,
+        operations: List[PreparationOperation],
+        source_version_id: Optional[str] = None,
+        limit: int = 20
+    ) -> PreviewPreparationResponse:
+        dataset = self.db.query(Dataset).filter(Dataset.id == dataset_id).first()
+        if not dataset:
+            raise KeyError(f"Dataset '{dataset_id}' not found.")
+
+        target_src_version_id = source_version_id or dataset.current_version_id
+        if not target_src_version_id:
+            raise ValueError(f"Dataset '{dataset_id}' has no active version to preview.")
+
+        source_version = self.db.query(DatasetVersion).filter(DatasetVersion.id == target_src_version_id).first()
+        if not source_version:
+            raise KeyError(f"Dataset version '{target_src_version_id}' not found.")
+
+        source_bytes = self.storage.get_file_bytes(source_version.storage_location)
+        text_stream = io.BytesIO(source_bytes)
+        try:
+            df_before = pd.read_csv(text_stream, encoding="utf-8-sig", dtype=str)
+        except UnicodeDecodeError:
+            text_stream.seek(0)
+            df_before = pd.read_csv(text_stream, encoding="latin-1", dtype=str)
+
+        df_after = df_before.copy()
+        for idx, op in enumerate(operations):
+            df_after = apply_single_operation(df_after, op)
+
+        total_rows_before = len(df_before)
+        total_rows_after = len(df_after)
+
+        sample_before = df_before.head(limit).fillna("")
+        sample_after = df_after.head(limit).fillna("")
+
+        db_cols = self.db.query(DatasetColumn).filter(
+            DatasetColumn.dataset_version_id == source_version.id
+        ).order_by(DatasetColumn.ordinal_position.asc()).all()
+
+        col_type_map = {c.name: c.physical_type for c in db_cols}
+
+        type_conversions = {}
+        for op in operations:
+            if op.operation_type == "convert_type" and op.target_column:
+                type_conversions[op.target_column] = op.params.get("target_type", "VARCHAR").upper()
+
+        columns_before = [
+            ColumnHeaderItem(
+                name=c,
+                physical_type=col_type_map.get(c, "VARCHAR")
+            )
+            for c in df_before.columns
+        ]
+
+        columns_after = [
+            ColumnHeaderItem(
+                name=c,
+                physical_type=type_conversions.get(c, col_type_map.get(c, "VARCHAR"))
+            )
+            for c in df_after.columns
+        ]
+
+        rows_before = sample_before.to_dict(orient="records")
+        rows_after = sample_after.to_dict(orient="records")
+
+        cell_changes: List[CellChangeItem] = []
+        common_cols = [c for c in df_before.columns if c in df_after.columns]
+
+        max_check = min(len(sample_before), len(sample_after))
+        for i in range(max_check):
+            for col in common_cols:
+                val_b = str(sample_before.iloc[i][col])
+                val_a = str(sample_after.iloc[i][col])
+                if val_b != val_a:
+                    cell_changes.append(
+                        CellChangeItem(
+                            row_index=i,
+                            column=col,
+                            before_value=val_b,
+                            after_value=val_a
+                        )
+                    )
+
+        changed_cells_count = len(cell_changes)
+        changed_rows_count = len(set(cc.row_index for cc in cell_changes))
+
+        return PreviewPreparationResponse(
+            dataset_id=dataset.id,
+            source_version_id=source_version.id,
+            total_rows_before=total_rows_before,
+            total_rows_after=total_rows_after,
+            preview_limit=limit,
+            changed_cells_count=changed_cells_count,
+            changed_rows_count=changed_rows_count,
+            columns_before=columns_before,
+            columns_after=columns_after,
+            rows_before=rows_before,
+            rows_after=rows_after,
+            cell_changes=cell_changes
+        )

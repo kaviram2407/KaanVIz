@@ -43,22 +43,40 @@ test.describe('KaanViz Phase 4 — Data Preparation E2E Workflow', () => {
       await expect(prepTab).toBeVisible({ timeout: 10000 });
       await prepTab.click();
 
-      // 6. Verify Preparation Workbench
+      // 6. Verify Preparation Workbench & Data Preview
       await expect(page.getByTestId('preparation-view')).toBeVisible();
       await expect(page.getByText('Data Preparation & Cleaning Workbench')).toBeVisible();
+      await expect(page.getByTestId('data-preview-card')).toBeVisible();
+      await expect(page.getByText('Data Preview')).toBeVisible();
 
-      // 7. Add an operation to plan
-      const addOpBtn = page.getByText('Add Operation to Plan');
-      await addOpBtn.click();
+      // 7. Test Interactive Column Header Type Selection
+      const typeHeaderBtn = page.getByTitle(/Change column .* type/i).first();
+      await expect(typeHeaderBtn).toBeVisible();
+      await typeHeaderBtn.click();
 
-      // 8. Apply Preparation Plan
-      const applyBtn = page.getByText('Apply Preparation Plan');
+      const typeOption = page.getByRole('button', { name: 'VARCHAR' });
+      await expect(typeOption).toBeVisible();
+      await typeOption.click();
+
+      // Verify queued operation
+      await expect(page.getByText('convert_type')).toBeVisible();
+
+      // 8. Test Dry-Run "Preview Changes"
+      const previewBtn = page.getByRole('button', { name: 'Preview Changes' }).first();
+      await expect(previewBtn).toBeEnabled();
+      await previewBtn.click();
+
+      // Verify dry-run preview active badge / summary message
+      await expect(page.getByText(/Dry-Run Preview Active|Preview:/i)).toBeVisible({ timeout: 10000 });
+
+      // 9. Apply Preparation Plan
+      const applyBtn = page.getByRole('button', { name: 'Apply Plan' }).first();
       await expect(applyBtn).toBeEnabled();
       await applyBtn.click();
 
-      // 9. Verify Before vs After Comparison Card
-      await expect(page.getByText('Preparation Plan Executed Successfully!')).toBeVisible({ timeout: 15000 });
-      await expect(page.getByText('Operations Applied')).toBeVisible();
+      // 10. Verify Applied Success & Active Version Update
+      await expect(page.getByText('Preparation Plan Executed Successfully!').first()).toBeVisible({ timeout: 15000 });
+      await expect(page.getByText('Transformation Lineage')).toBeVisible();
     } finally {
       if (fs.existsSync(testCsvPath)) {
         fs.unlinkSync(testCsvPath);

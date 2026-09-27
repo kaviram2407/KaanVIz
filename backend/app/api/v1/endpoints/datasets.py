@@ -289,10 +289,105 @@ from app.schemas.dataset import (
     TransformationItem,
     ValidateDatasetRequest,
     ValidateDatasetResponse,
-    ValidationIssueItem
+    ValidationIssueItem,
+    DatasetSampleResponse,
+    PreviewPreparationResponse
 )
 from app.services.preparation_service import PreparationService
 from app.models.dataset import Transformation
+
+
+@router.get(
+    "/datasets/{dataset_id}/sample",
+    response_model=DatasetSampleResponse,
+    summary="Get representative dataset sample rows and column header types"
+)
+@router.get(
+    "/workspaces/{workspace_id}/datasets/{dataset_id}/sample",
+    response_model=DatasetSampleResponse,
+    summary="Get dataset sample rows in workspace"
+)
+def get_dataset_sample_endpoint(
+    dataset_id: str,
+    limit: int = 20,
+    version_id: Optional[str] = None,
+    workspace_id: str = DEFAULT_WORKSPACE_ID,
+    db: Session = Depends(get_db)
+):
+    dataset = db.query(Dataset).filter(Dataset.workspace_id == workspace_id, Dataset.id == dataset_id).first()
+    if not dataset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "DATASET_NOT_FOUND", "message": "Requested dataset does not exist."}}
+        )
+
+    try:
+        prep_service = PreparationService(db)
+        return prep_service.get_dataset_sample(
+            dataset_id=dataset.id,
+            version_id=version_id,
+            limit=limit
+        )
+    except KeyError as ke:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "RESOURCE_NOT_FOUND", "message": str(ke)}}
+        )
+    except ValueError as ve:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "SAMPLE_ERROR", "message": str(ve)}}
+        )
+
+
+@router.post(
+    "/datasets/{dataset_id}/prepare/preview",
+    response_model=PreviewPreparationResponse,
+    summary="Preview preparation plan (dry-run without disk modification)"
+)
+@router.post(
+    "/workspaces/{workspace_id}/datasets/{dataset_id}/prepare/preview",
+    response_model=PreviewPreparationResponse,
+    summary="Preview preparation plan in workspace"
+)
+def preview_preparation_endpoint(
+    dataset_id: str,
+    req: PrepareDatasetRequest,
+    limit: int = 20,
+    workspace_id: str = DEFAULT_WORKSPACE_ID,
+    db: Session = Depends(get_db)
+):
+    dataset = db.query(Dataset).filter(Dataset.workspace_id == workspace_id, Dataset.id == dataset_id).first()
+    if not dataset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "DATASET_NOT_FOUND", "message": "Requested dataset does not exist."}}
+        )
+
+    if not req.operations or len(req.operations) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "INVALID_OPERATIONS", "message": "At least one preparation operation must be provided for preview."}}
+        )
+
+    try:
+        prep_service = PreparationService(db)
+        return prep_service.preview_preparation(
+            dataset_id=dataset.id,
+            operations=req.operations,
+            source_version_id=req.source_version_id,
+            limit=limit
+        )
+    except ValueError as ve:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "PREVIEW_ERROR", "message": str(ve)}}
+        )
+    except KeyError as ke:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "RESOURCE_NOT_FOUND", "message": str(ke)}}
+        )
 
 
 @router.post(
@@ -437,4 +532,265 @@ def validate_dataset_endpoint(
         status="valid" if len(issues) == 0 else "invalid",
         issues=issues
     )
+
+
+# Phase 5 Data Modeling & Relationship Endpoints
+
+from app.schemas.dataset import (
+    DataModelItem,
+    DataModelDetailsResponse,
+    ModelDatasetItem,
+    RelationshipItem,
+    BindDatasetToModelRequest,
+    CreateRelationshipRequest,
+    ValidateRelationshipRequest,
+    ValidateRelationshipResponse
+)
+from app.services.modeling_service import ModelingService
+from app.models.dataset import DataModel, ModelDataset, Relationship
+
+
+@router.get(
+    "/models",
+    response_model=DataModelDetailsResponse,
+    summary="Get workspace data model details"
+)
+@router.get(
+    "/workspaces/{workspace_id}/models",
+    response_model=DataModelDetailsResponse,
+    summary="Get data model details for workspace"
+)
+def get_workspace_data_model(workspace_id: str = DEFAULT_WORKSPACE_ID, db: Session = Depends(get_db)):
+    service = ModelingService(db)
+    try:
+        model = service.get_or_create_model(workspace_id)
+        datasets = db.query(ModelDataset).filter(ModelDataset.model_id == model.id).all()
+        relationships = db.query(Relationship).filter(Relationship.model_id == model.id).all()
+
+        return DataModelDetailsResponse(
+            id=model.id,
+            workspace_id=model.workspace_id,
+            name=model.name,
+            description=model.description,
+            status=model.status,
+            datasets=[ModelDatasetItem.model_validate(ds) for ds in datasets],
+            relationships=[RelationshipItem.model_validate(rel) for rel in relationships],
+            created_at=model.created_at,
+            updated_at=model.updated_at
+        )
+    except KeyError as ke:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "WORKSPACE_NOT_FOUND", "message": str(ke)}}
+        )
+
+
+@router.get(
+    "/models/{model_id}",
+    response_model=DataModelDetailsResponse,
+    summary="Get model details by ID"
+)
+@router.get(
+    "/workspaces/{workspace_id}/models/{model_id}",
+    response_model=DataModelDetailsResponse,
+    summary="Get model details by ID in workspace"
+)
+def get_data_model_by_id(model_id: str, workspace_id: str = DEFAULT_WORKSPACE_ID, db: Session = Depends(get_db)):
+    model = db.query(DataModel).filter(DataModel.workspace_id == workspace_id, DataModel.id == model_id).first()
+    if not model:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "MODEL_NOT_FOUND", "message": "Requested data model does not exist."}}
+        )
+
+    datasets = db.query(ModelDataset).filter(ModelDataset.model_id == model.id).all()
+    relationships = db.query(Relationship).filter(Relationship.model_id == model.id).all()
+
+    return DataModelDetailsResponse(
+        id=model.id,
+        workspace_id=model.workspace_id,
+        name=model.name,
+        description=model.description,
+        status=model.status,
+        datasets=[ModelDatasetItem.model_validate(ds) for ds in datasets],
+        relationships=[RelationshipItem.model_validate(rel) for rel in relationships],
+        created_at=model.created_at,
+        updated_at=model.updated_at
+    )
+
+
+@router.post(
+    "/models/{model_id}/datasets",
+    response_model=ModelDatasetItem,
+    status_code=status.HTTP_201_CREATED,
+    summary="Bind dataset version to model"
+)
+@router.post(
+    "/workspaces/{workspace_id}/models/{model_id}/datasets",
+    response_model=ModelDatasetItem,
+    status_code=status.HTTP_201_CREATED,
+    summary="Bind dataset version to model in workspace"
+)
+def bind_dataset_to_model_endpoint(
+    model_id: str,
+    req: BindDatasetToModelRequest,
+    workspace_id: str = DEFAULT_WORKSPACE_ID,
+    db: Session = Depends(get_db)
+):
+    service = ModelingService(db)
+    try:
+        binding = service.bind_dataset_to_model(
+            model_id=model_id,
+            dataset_id=req.dataset_id,
+            version_id=req.dataset_version_id,
+            alias=req.alias
+        )
+        return ModelDatasetItem.model_validate(binding)
+    except KeyError as ke:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "RESOURCE_NOT_FOUND", "message": str(ke)}}
+        )
+    except ValueError as ve:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "BINDING_ERROR", "message": str(ve)}}
+        )
+
+
+@router.post(
+    "/models/{model_id}/relationships/validate",
+    response_model=ValidateRelationshipResponse,
+    summary="Validate relationship proposal"
+)
+@router.post(
+    "/workspaces/{workspace_id}/models/{model_id}/relationships/validate",
+    response_model=ValidateRelationshipResponse,
+    summary="Validate relationship proposal in workspace"
+)
+def validate_relationship_endpoint(
+    model_id: str,
+    req: ValidateRelationshipRequest,
+    workspace_id: str = DEFAULT_WORKSPACE_ID,
+    db: Session = Depends(get_db)
+):
+    service = ModelingService(db)
+    is_valid, issues = service.validate_relationship(
+        workspace_id=workspace_id,
+        model_id=model_id,
+        source_dataset_id=req.source_dataset_id,
+        source_field=req.source_field,
+        target_dataset_id=req.target_dataset_id,
+        target_field=req.target_field,
+        cardinality=req.cardinality,
+        source_version_id=req.source_version_id,
+        target_version_id=req.target_version_id
+    )
+
+    return ValidateRelationshipResponse(is_valid=is_valid, issues=issues)
+
+
+@router.post(
+    "/models/{model_id}/relationships",
+    response_model=RelationshipItem,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create relationship in model"
+)
+@router.post(
+    "/workspaces/{workspace_id}/models/{model_id}/relationships",
+    response_model=RelationshipItem,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create relationship in model in workspace"
+)
+def create_relationship_endpoint(
+    model_id: str,
+    req: CreateRelationshipRequest,
+    workspace_id: str = DEFAULT_WORKSPACE_ID,
+    db: Session = Depends(get_db)
+):
+    service = ModelingService(db)
+    try:
+        rel = service.create_relationship(
+            workspace_id=workspace_id,
+            model_id=model_id,
+            source_dataset_id=req.source_dataset_id,
+            source_field=req.source_field,
+            target_dataset_id=req.target_dataset_id,
+            target_field=req.target_field,
+            cardinality=req.cardinality,
+            source_version_id=req.source_version_id,
+            target_version_id=req.target_version_id
+        )
+        return RelationshipItem.model_validate(rel)
+    except ValueError as ve:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "INVALID_RELATIONSHIP", "message": str(ve)}}
+        )
+    except KeyError as ke:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "RESOURCE_NOT_FOUND", "message": str(ke)}}
+        )
+
+
+@router.get(
+    "/models/{model_id}/relationships",
+    response_model=List[RelationshipItem],
+    summary="List model relationships"
+)
+@router.get(
+    "/workspaces/{workspace_id}/models/{model_id}/relationships",
+    response_model=List[RelationshipItem],
+    summary="List model relationships in workspace"
+)
+def list_relationships_endpoint(
+    model_id: str,
+    workspace_id: str = DEFAULT_WORKSPACE_ID,
+    db: Session = Depends(get_db)
+):
+    model = db.query(DataModel).filter(DataModel.workspace_id == workspace_id, DataModel.id == model_id).first()
+    if not model:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "MODEL_NOT_FOUND", "message": "Requested data model does not exist."}}
+        )
+
+    service = ModelingService(db)
+    rels = service.get_model_relationships(model.id)
+    return [RelationshipItem.model_validate(r) for r in rels]
+
+
+@router.delete(
+    "/models/{model_id}/relationships/{relationship_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete relationship from model"
+)
+@router.delete(
+    "/workspaces/{workspace_id}/models/{model_id}/relationships/{relationship_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete relationship from model in workspace"
+)
+def delete_relationship_endpoint(
+    model_id: str,
+    relationship_id: str,
+    workspace_id: str = DEFAULT_WORKSPACE_ID,
+    db: Session = Depends(get_db)
+):
+    model = db.query(DataModel).filter(DataModel.workspace_id == workspace_id, DataModel.id == model_id).first()
+    if not model:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "MODEL_NOT_FOUND", "message": "Requested data model does not exist."}}
+        )
+
+    service = ModelingService(db)
+    success = service.delete_relationship(model.id, relationship_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "RELATIONSHIP_NOT_FOUND", "message": "Requested relationship does not exist in model."}}
+        )
+    return None
+
 
