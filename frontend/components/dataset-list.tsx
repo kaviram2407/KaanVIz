@@ -51,19 +51,23 @@ export function DatasetList({ datasets, isLoading, onSelectDataset, onDeleteData
 
               <div>
                 <div className="flex items-center space-x-2">
-                  <h4 className="font-semibold text-slate-100 text-sm group-hover:text-indigo-400 transition-colors">
+                  <h4
+                    className="font-semibold text-slate-100 text-sm group-hover:text-indigo-400 transition-colors truncate max-w-[260px] sm:max-w-[360px]"
+                    title={ds.name}
+                  >
                     {ds.name}
                   </h4>
-                  <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 text-[10px] uppercase">
+                  <Badge variant="outline" className="border-emerald-500/40 text-emerald-300 bg-emerald-950/40 text-[10px] uppercase font-semibold shrink-0">
                     {ds.status}
                   </Badge>
                 </div>
                 <div className="flex items-center space-x-4 text-xs text-slate-400 mt-1">
-                  <span className="flex items-center">
-                    <HardDrive className="h-3 w-3 mr-1" />
-                    {ds.original_filename} ({(ds.file_size_bytes / 1024).toFixed(1)} KB)
+                  <span className="flex items-center truncate max-w-[240px]" title={ds.original_filename}>
+                    <HardDrive className="h-3 w-3 mr-1 shrink-0" />
+                    <span className="truncate">{ds.original_filename}</span>
+                    <span className="ml-1 text-slate-400">({(ds.file_size_bytes / 1024).toFixed(1)} KB)</span>
                   </span>
-                  <span className="flex items-center">
+                  <span className="flex items-center shrink-0">
                     <Calendar className="h-3 w-3 mr-1" />
                     {new Date(ds.created_at).toLocaleDateString()}
                   </span>
@@ -76,8 +80,11 @@ export function DatasetList({ datasets, isLoading, onSelectDataset, onDeleteData
                 <div className="font-mono text-slate-200 font-medium">
                   {ds.row_count ?? 0} rows × {ds.column_count ?? 0} cols
                 </div>
-                <span className="text-[10px] text-slate-500">Raw Immutable CSV</span>
+                <span className="text-[10px] text-slate-300 font-medium px-1.5 py-0.5 rounded bg-slate-800/80 border border-slate-700/60 inline-block mt-0.5">
+                  Raw Immutable CSV
+                </span>
               </div>
+
 
               <Button
                 variant="outline"

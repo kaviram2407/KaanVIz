@@ -90,16 +90,26 @@ export function DatasetUploader({ onUploadSuccess }: DatasetUploaderProps) {
       {!successData ? (
         <div
           data-testid="dropzone"
+          tabIndex={0}
+          role="button"
+          aria-label="Upload CSV Dataset file dropzone"
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
-          className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 cursor-pointer ${
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              fileInputRef.current?.click();
+            }
+          }}
+          className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500 ${
             isDragOver
-              ? "border-primary bg-primary/5 scale-[1.01]"
+              ? "border-indigo-500 bg-indigo-950/20 scale-[1.01]"
               : "border-slate-800 bg-slate-900/50 hover:border-slate-700"
           }`}
           onClick={() => fileInputRef.current?.click()}
         >
+
           <input
             ref={fileInputRef}
             type="file"

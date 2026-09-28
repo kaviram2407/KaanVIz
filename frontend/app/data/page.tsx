@@ -399,12 +399,14 @@ export default function DataPage() {
                 </label>
                 <input
                   type="text"
+                  autoFocus
                   data-testid="clear-workspace-input"
                   value={confirmClearText}
                   onChange={(e) => setConfirmClearText(e.target.value)}
                   placeholder="CLEAR"
                   className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-rose-500 font-mono"
                 />
+
               </div>
             </div>
 
