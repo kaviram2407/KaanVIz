@@ -51,9 +51,12 @@ class Settings(BaseSettings):
     AI_ENABLED: bool = False
     AI_PROVIDER: str = "none"
     AI_API_KEY: str = ""
+    NVIDIA_API_KEY: str = ""
+    NVIDIA_BASE_URL: str = "https://integrate.api.nvidia.com/v1"
+    NVIDIA_MODEL: str = "nvidia/nemotron-3-super-120b-a12b"
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=("../.env", ".env"),
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore"

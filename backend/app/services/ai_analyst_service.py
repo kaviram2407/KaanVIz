@@ -18,6 +18,7 @@ from app.schemas.analytics import (
 )
 from app.schemas.ai import (
     AIAvailabilityResponse,
+    AITestConnectionResponse,
     AnalyticsQueryIntent,
     AIVisualizationSuggestion,
     AIInsight,
@@ -41,28 +42,77 @@ class AIAnalystService:
         """
         Returns the explicit AI availability status.
         """
+        provider_name = settings.AI_PROVIDER or "none"
+        model_name = settings.NVIDIA_MODEL if provider_name.lower() == "nvidia" else ("mock-v1" if provider_name.lower() == "mock" else "unknown")
+
         if not settings.AI_ENABLED:
             return AIAvailabilityResponse(
                 enabled=False,
-                provider=settings.AI_PROVIDER or "none",
+                provider=provider_name,
                 status="disabled",
-                message="AI Analyst is currently disabled in environment configuration."
+                message="AI Analyst is currently disabled in environment configuration.",
+                model=model_name,
+                configured=False
             )
 
-        if not self.provider or not self.provider.is_available():
+        if not self.provider:
             return AIAvailabilityResponse(
                 enabled=False,
-                provider=settings.AI_PROVIDER or "none",
+                provider=provider_name,
                 status="unavailable",
-                message="AI Provider is unconfigured or unavailable."
+                message="AI Provider is unconfigured or unavailable.",
+                model=model_name,
+                configured=False
             )
 
+        is_avail = self.provider.is_available()
+        active_model = getattr(self.provider, "model", model_name)
+
         return AIAvailabilityResponse(
-            enabled=True,
-            provider=settings.AI_PROVIDER or "mock",
-            status="enabled",
-            message="AI Analyst is fully operational."
+            enabled=is_avail,
+            provider=provider_name,
+            status="enabled" if is_avail else "unavailable",
+            message="AI Analyst is fully operational." if is_avail else "AI Provider API key is missing or invalid.",
+            model=active_model,
+            configured=is_avail
         )
+
+    def test_connection(self) -> AITestConnectionResponse:
+        """
+        Executes connection test against active AI provider.
+        """
+        provider_name = settings.AI_PROVIDER or "none"
+        model_name = settings.NVIDIA_MODEL if provider_name.lower() == "nvidia" else ("mock-v1" if provider_name.lower() == "mock" else "unknown")
+
+        if not settings.AI_ENABLED:
+            return AITestConnectionResponse(
+                success=False,
+                provider=provider_name,
+                model=model_name,
+                configured=False,
+                message="AI Analyst is currently disabled in environment settings."
+            )
+
+        provider = self.provider or get_ai_provider()
+        if not provider:
+            if provider_name.lower() == "nvidia":
+                from app.services.ai_provider import NVIDIAProvider
+                provider = NVIDIAProvider()
+            elif provider_name.lower() == "mock":
+                from app.services.ai_provider import MockAIProvider
+                provider = MockAIProvider()
+
+        if not provider:
+            return AITestConnectionResponse(
+                success=False,
+                provider=provider_name,
+                model=model_name,
+                configured=False,
+                message="No AI provider configured."
+            )
+
+        res = provider.test_connection()
+        return AITestConnectionResponse(**res)
 
     def build_bounded_context(
         self,

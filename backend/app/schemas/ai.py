@@ -19,6 +19,16 @@ class AIAvailabilityResponse(BaseModel):
         description="Availability status: 'enabled', 'disabled', 'unavailable', 'provider_error'"
     )
     message: Optional[str] = Field(None, description="Detailed status or error message")
+    model: Optional[str] = Field(None, description="Active AI model name")
+    configured: Optional[bool] = Field(None, description="Whether API key / provider is configured")
+
+
+class AITestConnectionResponse(BaseModel):
+    success: bool = Field(..., description="Whether connection test succeeded")
+    provider: str = Field(..., description="Target provider name")
+    model: str = Field(..., description="Target model name")
+    configured: bool = Field(..., description="Whether provider is configured")
+    message: str = Field(..., description="Detailed result or error message")
 
 
 class AnalyticsQueryIntent(BaseModel):

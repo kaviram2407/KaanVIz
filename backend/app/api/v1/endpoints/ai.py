@@ -13,6 +13,7 @@ def get_db():
 
 from app.schemas.ai import (
     AIAvailabilityResponse,
+    AITestConnectionResponse,
     NLQuestionRequest,
     NLQuestionResponse,
     AIVisualizeRequest,
@@ -35,6 +36,16 @@ def get_ai_status(db: Session = Depends(get_db)):
     """
     service = AIAnalystService(db=db)
     return service.check_availability()
+
+
+@router.post("/test-connection", response_model=AITestConnectionResponse)
+def test_ai_connection(db: Session = Depends(get_db)):
+    """
+    Tests connection to the configured AI provider.
+    Never exposes API keys or secrets in response.
+    """
+    service = AIAnalystService(db=db)
+    return service.test_connection()
 
 
 @router.post("/query", response_model=NLQuestionResponse)

@@ -184,3 +184,131 @@ def test_prompt_injection_defense(db: Session):
         if os.path.exists("./storage/raw/test_inj.csv"):
             os.remove("./storage/raw/test_inj.csv")
 
+
+def test_nvidia_provider_selection():
+    from app.services.ai_provider import NVIDIAProvider, get_ai_provider
+    with patch.object(settings, "AI_ENABLED", True), \
+         patch.object(settings, "AI_PROVIDER", "nvidia"), \
+         patch.object(settings, "NVIDIA_API_KEY", "nvapi-secret-key-12345"):
+        provider = get_ai_provider()
+        assert isinstance(provider, NVIDIAProvider)
+        assert provider.is_available() is True
+        assert provider.model == "nvidia/nemotron-3-super-120b-a12b"
+
+
+def test_nvidia_provider_missing_api_key():
+    from app.services.ai_provider import NVIDIAProvider, get_ai_provider
+    with patch.object(settings, "AI_ENABLED", True), \
+         patch.object(settings, "AI_PROVIDER", "nvidia"), \
+         patch.object(settings, "NVIDIA_API_KEY", ""), \
+         patch.object(settings, "AI_API_KEY", ""):
+        provider = get_ai_provider()
+        assert provider is None
+
+        nv = NVIDIAProvider(api_key="")
+        assert nv.is_available() is False
+        test_res = nv.test_connection()
+        assert test_res["success"] is False
+        assert test_res["configured"] is False
+        assert "missing or not configured" in test_res["message"]
+        assert "nvapi" not in str(test_res)
+
+
+def test_nvidia_provider_successful_connection_mocked():
+    SECRET_KEY = "nvapi-secret-test-key-999"
+    with patch.object(settings, "AI_ENABLED", True), \
+         patch.object(settings, "AI_PROVIDER", "nvidia"), \
+         patch.object(settings, "NVIDIA_API_KEY", SECRET_KEY):
+        
+        class MockResponse:
+            status = 200
+            def read(self):
+                return b'{"choices":[{"message":{"content":"pong"}}]}'
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                pass
+
+        with patch("urllib.request.urlopen", return_value=MockResponse()):
+            res = client.post("/api/v1/ai/test-connection")
+            assert res.status_code == 200
+            data = res.json()
+            assert data["success"] is True
+            assert data["provider"] == "nvidia"
+            assert data["model"] == "nvidia/nemotron-3-super-120b-a12b"
+            assert data["configured"] is True
+            assert SECRET_KEY not in str(data)
+
+
+def test_nvidia_provider_api_error_handling():
+    SECRET_KEY = "nvapi-secret-test-key-999"
+    with patch.object(settings, "AI_ENABLED", True), \
+         patch.object(settings, "AI_PROVIDER", "nvidia"), \
+         patch.object(settings, "NVIDIA_API_KEY", SECRET_KEY):
+        
+        import urllib.error
+        http_err = urllib.error.HTTPError(
+            url="https://integrate.api.nvidia.com/v1/chat/completions",
+            code=401,
+            msg="Unauthorized",
+            hdrs={},
+            fp=None
+        )
+
+        with patch("urllib.request.urlopen", side_effect=http_err):
+            res = client.post("/api/v1/ai/test-connection")
+            assert res.status_code == 200
+            data = res.json()
+            assert data["success"] is False
+            assert "Invalid NVIDIA API key" in data["message"]
+            assert SECRET_KEY not in str(data)
+
+
+def test_nvidia_provider_timeout_handling():
+    SECRET_KEY = "nvapi-secret-test-key-999"
+    with patch.object(settings, "AI_ENABLED", True), \
+         patch.object(settings, "AI_PROVIDER", "nvidia"), \
+         patch.object(settings, "NVIDIA_API_KEY", SECRET_KEY):
+        
+        import urllib.error
+        url_err = urllib.error.URLError("Connection timed out")
+
+        with patch("urllib.request.urlopen", side_effect=url_err):
+            res = client.post("/api/v1/ai/test-connection")
+            assert res.status_code == 200
+            data = res.json()
+            assert data["success"] is False
+            assert "network error" in data["message"].lower() or "timed out" in data["message"].lower()
+            assert SECRET_KEY not in str(data)
+
+
+def test_nvidia_provider_malformed_response(db: Session):
+    ds = Dataset(id="ds_ai_mal_1", name="Malformed Dataset", workspace_id="default", current_version_id="ver_mal_1")
+    ver = DatasetVersion(id="ver_mal_1", dataset_id=ds.id, version_number=1, storage_location="raw/test_mal.csv")
+    col1 = DatasetColumn(id="col_m_1", dataset_id=ds.id, dataset_version_id=ver.id, name="cat", physical_type="VARCHAR")
+    col2 = DatasetColumn(id="col_m_2", dataset_id=ds.id, dataset_version_id=ver.id, name="val", physical_type="FLOAT")
+
+    db.add_all([ds, ver, col1, col2])
+    db.commit()
+
+    SECRET_KEY = "nvapi-secret-test-key-999"
+    with patch.object(settings, "AI_ENABLED", True), \
+         patch.object(settings, "AI_PROVIDER", "nvidia"), \
+         patch.object(settings, "NVIDIA_API_KEY", SECRET_KEY):
+
+        class MockMalformedResponse:
+            status = 200
+            def read(self):
+                return b'{"choices":[{"message":{"content":"NOT_VALID_JSON"}}]}'
+            def __enter__(self):
+                return self
+            def __exit__(self, *args):
+                pass
+
+        with patch("urllib.request.urlopen", return_value=MockMalformedResponse()):
+            res = client.post("/api/v1/ai/query", json={"question": "What is val by cat?", "dataset_id": ds.id})
+            assert res.status_code == 422
+            detail = res.json()["detail"]
+            assert "validation failed" in detail.lower() or "formatting error" in detail.lower()
+            assert SECRET_KEY not in str(res.json())
+

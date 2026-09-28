@@ -7,7 +7,9 @@ import {
   generateAIVisualization,
   explainAIVisual,
   fetchAIInsights,
+  testAIConnection,
   AIAvailabilityResponse,
+  AITestConnectionResponse,
   NLQuestionResponse,
   AIVisualizeResponse,
   AIExplainResponse,
@@ -15,7 +17,7 @@ import {
   AIVisualizationSuggestion,
 } from "@/lib/ai-api";
 import { VisualizationChart } from "@/components/visualization-chart";
-import { Bot, Sparkles, HelpCircle, BarChart3, Lightbulb, Check, X, AlertTriangle, ShieldCheck } from "lucide-react";
+import { Bot, Sparkles, HelpCircle, BarChart3, Lightbulb, Check, X, AlertTriangle, ShieldCheck, Activity, Cpu } from "lucide-react";
 
 interface AIAnalystPanelProps {
   datasetId?: string;
@@ -26,6 +28,10 @@ interface AIAnalystPanelProps {
 export function AIAnalystPanel({ datasetId, dashboardId, onApproveVisual }: AIAnalystPanelProps) {
   const [aiStatus, setAiStatus] = useState<AIAvailabilityResponse | null>(null);
   const [activeTab, setActiveTab] = useState<"query" | "visualize" | "insights" | "explain">("query");
+
+  // Test Connection State
+  const [testLoading, setTestLoading] = useState(false);
+  const [testResult, setTestResult] = useState<AITestConnectionResponse | null>(null);
 
   // NL Query State
   const [question, setQuestion] = useState("");
@@ -55,6 +61,28 @@ export function AIAnalystPanel({ datasetId, dashboardId, onApproveVisual }: AIAn
   useEffect(() => {
     fetchAIStatus().then(setAiStatus).catch(console.error);
   }, []);
+
+  const handleTestConnection = async () => {
+    setTestLoading(true);
+    setTestResult(null);
+    try {
+      const res = await testAIConnection();
+      setTestResult(res);
+      // Refresh AI status after test
+      const statusRes = await fetchAIStatus();
+      setAiStatus(statusRes);
+    } catch (err: any) {
+      setTestResult({
+        success: false,
+        provider: aiStatus?.provider || "unknown",
+        model: aiStatus?.model || "unknown",
+        configured: false,
+        message: err?.message || "Failed to execute connection test.",
+      });
+    } finally {
+      setTestLoading(false);
+    }
+  };
 
   const handleAskQuestion = async (qText?: string) => {
     const targetQ = qText || question;
@@ -193,6 +221,65 @@ export function AIAnalystPanel({ datasetId, dashboardId, onApproveVisual }: AIAn
           )}
         </div>
       </div>
+
+      {/* Provider Details & Test Connection Bar */}
+      <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 text-xs">
+        <div className="flex flex-wrap items-center gap-6 text-slate-300">
+          <div className="flex items-center gap-1.5">
+            <Cpu className="w-4 h-4 text-cyan-400" />
+            <span className="text-slate-400 font-medium">Provider:</span>
+            <span className="font-semibold text-slate-100 uppercase tracking-wide">{aiStatus?.provider || "N/A"}</span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-400 font-medium">Model:</span>
+            <span className="font-mono text-cyan-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+              {aiStatus?.model || "N/A"}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-400 font-medium">Config:</span>
+            <span
+              className={`px-2 py-0.5 rounded font-semibold text-[11px] ${
+                aiStatus?.configured
+                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                  : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
+              }`}
+            >
+              {aiStatus?.configured ? "Configured" : "Not Configured"}
+            </span>
+          </div>
+        </div>
+
+        <button
+          onClick={handleTestConnection}
+          disabled={testLoading}
+          className="px-3.5 py-1.5 bg-cyan-950/80 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-500/30 font-medium rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
+        >
+          <Activity className="w-3.5 h-3.5 text-cyan-400" />
+          {testLoading ? "Testing Connection..." : "Test Connection"}
+        </button>
+      </div>
+
+      {/* Test Connection Result Banner */}
+      {testResult && (
+        <div
+          className={`p-3 rounded-lg border text-xs flex items-center justify-between ${
+            testResult.success
+              ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-300"
+              : "bg-rose-950/40 border-rose-500/40 text-rose-300"
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {testResult.success ? <Check className="w-4 h-4 text-emerald-400" /> : <AlertTriangle className="w-4 h-4 text-rose-400" />}
+            <span>{testResult.message} (Provider: {testResult.provider}, Model: {testResult.model})</span>
+          </div>
+          <button onClick={() => setTestResult(null)} className="text-slate-400 hover:text-slate-200">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Disabled Banner Notice */}
       {!isAIEnabled && aiStatus && (
