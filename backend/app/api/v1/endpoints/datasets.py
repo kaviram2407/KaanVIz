@@ -794,3 +794,87 @@ def delete_relationship_endpoint(
     return None
 
 
+# Dataset Deletion & Workspace Data Cleanup Endpoints
+
+from app.services.dataset_cleanup_service import DatasetCleanupService
+
+
+@router.delete(
+    "/datasets/{dataset_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Delete dataset and all associated artifacts"
+)
+@router.delete(
+    "/workspaces/{workspace_id}/datasets/{dataset_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Delete dataset and all associated artifacts in workspace"
+)
+def delete_dataset_endpoint(
+    dataset_id: str,
+    workspace_id: str = DEFAULT_WORKSPACE_ID,
+    db: Session = Depends(get_db)
+):
+    service = DatasetCleanupService(db)
+    try:
+        result = service.delete_dataset(dataset_id=dataset_id, workspace_id=workspace_id)
+        return {
+            "status": "success",
+            "message": f"Dataset '{dataset_id}' and all associated artifacts permanently deleted.",
+            "details": result
+        }
+    except KeyError as ke:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "DATASET_NOT_FOUND", "message": str(ke)}}
+        )
+    except Exception as e:
+        logger.error(f"Failed to delete dataset {dataset_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "DELETION_FAILED", "message": f"Failed to delete dataset: {str(e)}"}}
+        )
+
+
+@router.delete(
+    "/workspace/data",
+    status_code=status.HTTP_200_OK,
+    summary="Clear all workspace datasets and artifacts"
+)
+@router.delete(
+    "/workspaces/{workspace_id}/data",
+    status_code=status.HTTP_200_OK,
+    summary="Clear all datasets and artifacts in workspace"
+)
+def clear_workspace_data_endpoint(
+    confirm_text: str,
+    workspace_id: str = DEFAULT_WORKSPACE_ID,
+    db: Session = Depends(get_db)
+):
+    if confirm_text != "CLEAR":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "INVALID_CONFIRMATION", "message": "Confirmation text 'CLEAR' is required to clear all workspace data."}}
+        )
+
+    service = DatasetCleanupService(db)
+    try:
+        result = service.clear_workspace_data(workspace_id=workspace_id)
+        return {
+            "status": "success",
+            "message": f"All data cleared for workspace '{workspace_id}'.",
+            "details": result
+        }
+    except ValueError as ve:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "INVALID_CONFIRMATION", "message": str(ve)}}
+        )
+    except Exception as e:
+        logger.error(f"Failed to clear workspace data for workspace {workspace_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"error": {"code": "CLEAR_FAILED", "message": f"Failed to clear workspace data: {str(e)}"}}
+        )
+
+
+

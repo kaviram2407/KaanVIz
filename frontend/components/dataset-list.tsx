@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Database, FileSpreadsheet, Calendar, HardDrive, BarChart2 } from "lucide-react";
+import { Database, FileSpreadsheet, Calendar, HardDrive, BarChart2, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,9 +11,10 @@ interface DatasetListProps {
   datasets: DatasetItem[];
   isLoading?: boolean;
   onSelectDataset?: (dataset: DatasetItem) => void;
+  onDeleteDataset?: (dataset: DatasetItem) => void;
 }
 
-export function DatasetList({ datasets, isLoading, onSelectDataset }: DatasetListProps) {
+export function DatasetList({ datasets, isLoading, onSelectDataset, onDeleteDataset }: DatasetListProps) {
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -26,7 +27,7 @@ export function DatasetList({ datasets, isLoading, onSelectDataset }: DatasetLis
 
   if (!datasets || datasets.length === 0) {
     return (
-      <div className="border border-slate-800/80 bg-slate-900/40 rounded-xl p-8 text-center">
+      <div className="border border-slate-800/80 bg-slate-900/40 rounded-xl p-8 text-center" data-testid="empty-datasets-banner">
         <Database className="h-8 w-8 text-slate-500 mx-auto mb-2" />
         <p className="text-slate-300 font-medium text-sm">No datasets registered yet</p>
         <p className="text-slate-500 text-xs mt-1">Upload your first CSV dataset above to begin ingestion.</p>
@@ -70,8 +71,8 @@ export function DatasetList({ datasets, isLoading, onSelectDataset }: DatasetLis
               </div>
             </div>
 
-            <div className="flex items-center space-x-4">
-              <div className="text-right text-xs">
+            <div className="flex items-center space-x-3">
+              <div className="text-right text-xs mr-2">
                 <div className="font-mono text-slate-200 font-medium">
                   {ds.row_count ?? 0} rows × {ds.column_count ?? 0} cols
                 </div>
@@ -90,6 +91,22 @@ export function DatasetList({ datasets, isLoading, onSelectDataset }: DatasetLis
               >
                 <BarChart2 className="h-3.5 w-3.5 mr-1" /> Profile
               </Button>
+
+              {onDeleteDataset && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-testid={`delete-dataset-btn-${ds.id}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteDataset(ds);
+                  }}
+                  className="border-rose-900/40 text-rose-400 hover:bg-rose-950/40 hover:border-rose-600/50 text-xs"
+                  title="Delete Dataset"
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -97,3 +114,4 @@ export function DatasetList({ datasets, isLoading, onSelectDataset }: DatasetLis
     </div>
   );
 }
+

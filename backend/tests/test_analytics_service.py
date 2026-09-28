@@ -14,13 +14,7 @@ from app.schemas.analytics import (
 )
 
 
-@pytest.fixture
-def db():
-    session = SessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
+
 
 
 @pytest.fixture
