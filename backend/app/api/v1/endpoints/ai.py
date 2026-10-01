@@ -1,5 +1,7 @@
+import time
+from collections import defaultdict
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
@@ -10,6 +12,23 @@ def get_db():
         yield db
     finally:
         db.close()
+
+# In-memory sliding window rate limiter: max 30 AI requests per minute per IP
+AI_REQUEST_HISTORY = defaultdict(list)
+MAX_AI_REQUESTS_PER_MIN = 30
+WINDOW_SECONDS = 60
+
+def check_ai_rate_limit(request: Request):
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    now = time.time()
+    history = [t for t in AI_REQUEST_HISTORY[client_ip] if now - t < WINDOW_SECONDS]
+    if len(history) >= MAX_AI_REQUESTS_PER_MIN:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Rate limit exceeded. Maximum {MAX_AI_REQUESTS_PER_MIN} AI requests per minute allowed."
+        )
+    history.append(now)
+    AI_REQUEST_HISTORY[client_ip] = history
 
 from app.schemas.ai import (
     AIAvailabilityResponse,
@@ -65,7 +84,8 @@ def test_ai_connection(db: Session = Depends(get_db)):
 @router.post("/query", response_model=NLQuestionResponse)
 def answer_natural_language_question(
     req: NLQuestionRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _=Depends(check_ai_rate_limit)
 ):
     """
     Processes a natural language question.
@@ -84,7 +104,8 @@ def answer_natural_language_question(
 @router.post("/visualize", response_model=AIVisualizeResponse)
 def generate_ai_visualization(
     req: AIVisualizeRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _=Depends(check_ai_rate_limit)
 ):
     """
     Converts a natural language request into a validated visualization spec.
@@ -101,7 +122,8 @@ def generate_ai_visualization(
 @router.post("/explain", response_model=AIExplainResponse)
 def explain_visualization(
     req: AIExplainVisualRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _=Depends(check_ai_rate_limit)
 ):
     """
     Generates a structured explanation for a given visualization specification.
@@ -118,7 +140,8 @@ def explain_visualization(
 @router.post("/insights", response_model=AIInsightsResponse)
 def generate_ai_insights(
     req: AIInsightsRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _=Depends(check_ai_rate_limit)
 ):
     """
     Generates structured AI insights grounded in deterministic context.

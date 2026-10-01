@@ -595,3 +595,22 @@ def test_ai_insights_ai_disabled(db: Session):
         assert res.status_code == 503
         assert "unavailable" in res.json()["detail"].lower() or "disabled" in res.json()["detail"].lower()
 
+
+def test_ai_rate_limiting():
+    from app.api.v1.endpoints.ai import AI_REQUEST_HISTORY
+    AI_REQUEST_HISTORY.clear()
+
+    with patch.object(settings, "AI_ENABLED", True), \
+         patch.object(settings, "AI_PROVIDER", "mock"):
+        # Send 30 requests - all should pass (200 or 503 depending on dataset_id, but not 429)
+        for _ in range(30):
+            res = client.post("/api/v1/ai/query", json={"question": "Revenue?"})
+            assert res.status_code != 429
+
+        # The 31st request must be rate-limited with 429
+        res = client.post("/api/v1/ai/query", json={"question": "Revenue?"})
+        assert res.status_code == 429
+        assert "rate limit exceeded" in res.json()["detail"].lower()
+
+    AI_REQUEST_HISTORY.clear()
+
