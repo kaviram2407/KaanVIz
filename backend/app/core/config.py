@@ -37,6 +37,18 @@ class Settings(BaseSettings):
         default="postgresql+psycopg2://kaanviz:kaanviz_dev_password@localhost:5432/kaanviz_db"
     )
 
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def assemble_database_url(cls, v: object) -> str:
+        if isinstance(v, str):
+            val = v.strip()
+            if val.startswith("postgres://"):
+                return val.replace("postgres://", "postgresql+psycopg2://", 1)
+            if val.startswith("postgresql://") and not val.startswith("postgresql+psycopg2://"):
+                return val.replace("postgresql://", "postgresql+psycopg2://", 1)
+            return val
+        return str(v)
+
     # Redis
     REDIS_URL: str = Field(default="redis://localhost:6379/0")
 
