@@ -60,11 +60,72 @@ class AIVisualizationSuggestion(BaseModel):
 
 
 class AIInsight(BaseModel):
-    type: str = Field(..., description="Insight category: 'trend', 'outlier', 'summary', 'correlation', 'distribution'")
+    model_config = ConfigDict(extra="forbid")
+
+    type: str = Field(..., description="Insight category: 'highest_value', 'lowest_value', 'largest_difference', 'ranking', 'concentration', 'trend', 'summary', 'outlier'")
     title: str = Field(..., description="Insight title")
-    summary: str = Field(..., description="Detailed textual summary")
+    description: str = Field(..., description="Detailed textual description")
+    summary: Optional[str] = Field(None, description="Alias for description")
+    severity: str = Field("info", description="Insight severity: 'info' or 'notable'")
     evidence: List[str] = Field(default_factory=list, description="Grounded quantitative evidence statements")
     related_fields: List[str] = Field(default_factory=list, description="Dataset fields involved")
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_and_sync(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            # Controlled type validation
+            raw_type = str(data.get("type", "summary")).lower().strip()
+            allowed_types = {
+                "highest_value", "lowest_value", "largest_difference",
+                "ranking", "concentration", "trend", "summary", "outlier"
+            }
+            if raw_type not in allowed_types:
+                raise ValueError(f"Invalid insight type '{raw_type}'. Allowed types: {sorted(list(allowed_types))}")
+            data["type"] = raw_type
+
+            # Controlled severity validation
+            raw_sev = str(data.get("severity", "info")).lower().strip()
+            if raw_sev not in {"info", "notable"}:
+                raise ValueError(f"Invalid severity '{raw_sev}'. Must be 'info' or 'notable'")
+            data["severity"] = raw_sev
+
+            # Description / summary sync & validation
+            desc = data.get("description") or data.get("summary") or ""
+            if not desc or not isinstance(desc, str) or not desc.strip():
+                raise ValueError("Insight description/summary cannot be empty")
+            validate_safe_text(desc, "description")
+            data["description"] = desc.strip()
+            data["summary"] = desc.strip()
+
+            # Title validation
+            title = data.get("title", "")
+            if not title or not isinstance(title, str) or not title.strip():
+                title = f"Insight: {raw_type.replace('_', ' ').title()}"
+            else:
+                validate_safe_text(title, "title")
+            data["title"] = title.strip()
+
+            # Evidence & related_fields validation
+            ev = data.get("evidence", [])
+            if isinstance(ev, list):
+                clean_ev = []
+                for idx, e_item in enumerate(ev):
+                    if isinstance(e_item, str) and e_item.strip():
+                        validate_safe_text(e_item, f"evidence[{idx}]")
+                        clean_ev.append(e_item.strip())
+                data["evidence"] = clean_ev
+
+            rf = data.get("related_fields", [])
+            if isinstance(rf, list):
+                clean_rf = []
+                for idx, r_item in enumerate(rf):
+                    if isinstance(r_item, str) and r_item.strip():
+                        validate_safe_text(r_item, f"related_fields[{idx}]")
+                        clean_rf.append(r_item.strip())
+                data["related_fields"] = clean_rf
+
+        return data
 
 
 import re
@@ -74,11 +135,11 @@ FORBIDDEN_HTML_SCRIPT_RE = re.compile(
     re.IGNORECASE,
 )
 FORBIDDEN_SQL_RE = re.compile(
-    r"\b(SELECT\s+(\*|[a-z0-9_,\s]+)\s+FROM|DROP\s+TABLE|INSERT\s+INTO|DELETE\s+FROM|ALTER\s+TABLE|UNION\s+SELECT|EXEC\s*\()\b",
+    r"\b(SELECT\s+(\*|[a-z0-9_,\s]+)\s+FROM|DROP\s+TABLE|INSERT\s+INTO|DELETE\s+FROM|ALTER\s+TABLE|UNION\s+SELECT|EXEC\s*\()",
     re.IGNORECASE,
 )
 FORBIDDEN_CODE_RE = re.compile(
-    r"\b(eval\s*\(|exec\s*\(|system\s*\(|process\.exit|__import__|function\s*\()\b",
+    r"\b(eval\s*\(|exec\s*\(|system\s*\(|process\.exit|__import__|function\s*\()",
     re.IGNORECASE,
 )
 
@@ -178,10 +239,23 @@ class AIExplainVisualRequest(BaseModel):
 
 class AIInsightsRequest(BaseModel):
     dataset_id: str = Field(..., description="Target dataset ID")
-    dashboard_id: Optional[str] = None
-    workspace_id: Optional[str] = Field("default")
+    visual_spec: Optional[VisualizationSpec] = Field(None, description="Optional visualization specification to analyze")
+    dashboard_id: Optional[str] = Field(None, description="Optional dashboard ID")
+    workspace_id: Optional[str] = Field("default", description="Workspace ID")
 
 
 class AIInsightsResponse(BaseModel):
-    dataset_id: str
-    insights: List[AIInsight]
+    model_config = ConfigDict(extra="forbid")
+
+    dataset_id: Optional[str] = Field(None, description="Dataset ID")
+    insights: List[AIInsight] = Field(default_factory=list, description="Bounded list of insights (max 5)")
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_insights_count(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            ins = data.get("insights", [])
+            if isinstance(ins, list):
+                if len(ins) > 5:
+                    raise ValueError(f"Excessive insight count ({len(ins)}). Maximum allowed is 5 insights.")
+        return data

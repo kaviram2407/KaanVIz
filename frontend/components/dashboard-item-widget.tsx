@@ -9,8 +9,8 @@ import {
   executeAnalyticsQuery,
 } from "@/lib/api-client";
 import { VisualizationChart } from "@/components/visualization-chart";
-import { Trash2, Move, Filter, Sparkles } from "lucide-react";
-import { explainAIVisual, AIExplainResponse } from "@/lib/ai-api";
+import { Trash2, Move, Filter, Sparkles, Lightbulb } from "lucide-react";
+import { explainAIVisual, fetchAIInsights, AIExplainResponse, AIInsight } from "@/lib/ai-api";
 
 interface DashboardItemWidgetProps {
   item: DashboardItemResponse;
@@ -41,11 +41,16 @@ export function DashboardItemWidget({
   const [explainLoading, setExplainLoading] = useState(false);
   const [explainError, setExplainError] = useState<string | null>(null);
 
+  const [insightsResult, setInsightsResult] = useState<AIInsight[] | null>(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insightsError, setInsightsError] = useState<string | null>(null);
+
   const spec = item.visualization_spec as VisualizationSpec;
 
   const handleExplain = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!item.dataset_id) return;
+    setInsightsResult(null);
     setExplainLoading(true);
     setExplainError(null);
     try {
@@ -58,6 +63,25 @@ export function DashboardItemWidget({
       setExplainError(err.message || "Failed to explain visual.");
     } finally {
       setExplainLoading(false);
+    }
+  };
+
+  const handleInsights = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!item.dataset_id) return;
+    setExplainResult(null);
+    setInsightsLoading(true);
+    setInsightsError(null);
+    try {
+      const res = await fetchAIInsights({
+        dataset_id: item.dataset_id,
+        visual_spec: spec,
+      });
+      setInsightsResult(res.insights || []);
+    } catch (err: any) {
+      setInsightsError(err.message || "Failed to fetch AI insights.");
+    } finally {
+      setInsightsLoading(false);
     }
   };
 
@@ -153,15 +177,26 @@ export function DashboardItemWidget({
             </span>
           )}
           {item.dataset_id && (
-            <button
-              onClick={handleExplain}
-              disabled={explainLoading}
-              className="p-1 text-slate-400 hover:text-cyan-400 disabled:opacity-50 rounded transition-colors flex items-center gap-1 text-[10px]"
-              title="Explain this visual using AI Analyst"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-              {explainLoading ? "Explaining..." : "Explain"}
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleExplain}
+                disabled={explainLoading || insightsLoading}
+                className="p-1 text-slate-400 hover:text-cyan-400 disabled:opacity-50 rounded transition-colors flex items-center gap-1 text-[10px]"
+                title="Explain this visual using AI Analyst"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                {explainLoading ? "Explaining..." : "Explain"}
+              </button>
+              <button
+                onClick={handleInsights}
+                disabled={explainLoading || insightsLoading}
+                className="p-1 text-slate-400 hover:text-amber-400 disabled:opacity-50 rounded transition-colors flex items-center gap-1 text-[10px]"
+                title="Generate AI Insights for this visual"
+              >
+                <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
+                {insightsLoading ? "Analyzing..." : "Insights"}
+              </button>
+            </div>
           )}
           {isEditing && (
             <button
@@ -219,6 +254,49 @@ export function DashboardItemWidget({
                 <li key={idx}>{obs}</li>
               ))}
             </ul>
+          )}
+        </div>
+      )}
+
+      {/* AI Insights Overlay */}
+      {insightsError && (
+        <div className="p-2 bg-rose-950/60 border border-rose-500/40 rounded text-rose-300 text-xs flex items-center justify-between">
+          <span>{insightsError}</span>
+          <button onClick={() => setInsightsError(null)} className="text-slate-400 hover:text-slate-200">×</button>
+        </div>
+      )}
+
+      {insightsResult && (
+        <div className="bg-slate-950/95 border border-amber-500/40 rounded-lg p-3 space-y-2 text-xs shadow-xl relative z-10">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+            <span className="font-bold text-slate-200 flex items-center gap-1.5">
+              <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
+              AI Insights
+            </span>
+            <button
+              onClick={() => setInsightsResult(null)}
+              className="text-slate-400 hover:text-slate-200 text-xs px-1.5 py-0.5 rounded bg-slate-800"
+              aria-label="Dismiss Insights"
+            >
+              Dismiss
+            </button>
+          </div>
+          {insightsResult.length === 0 ? (
+            <p className="text-slate-400 italic">No notable insights found for this visual.</p>
+          ) : (
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {insightsResult.map((ins, idx) => (
+                <div key={idx} className="bg-slate-900/80 p-2 rounded border border-slate-800 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-200 text-xs">{ins.title}</span>
+                    <span className="text-[9px] px-1.5 py-0.5 bg-amber-500/10 text-amber-400 rounded uppercase font-bold">
+                      {ins.type.replace("_", " ")}
+                    </span>
+                  </div>
+                  <p className="text-slate-300 text-[11px] leading-snug">{ins.description || ins.summary}</p>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}

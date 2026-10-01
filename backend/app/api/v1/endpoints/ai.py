@@ -124,12 +124,9 @@ def generate_ai_insights(
     Generates structured AI insights grounded in deterministic context.
     """
     service = AIAnalystService(db=db)
-    insights = service.generate_insights(
+    return service.generate_insights(
         dataset_id=req.dataset_id,
+        visual_spec=req.visual_spec,
         dashboard_id=req.dashboard_id,
         workspace_id=req.workspace_id or "default"
-    )
-    return AIInsightsResponse(
-        dataset_id=req.dataset_id,
-        insights=insights
     )

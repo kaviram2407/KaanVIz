@@ -23,6 +23,7 @@ from app.schemas.ai import (
     AIVisualizationSuggestion,
     AIInsight,
     AIExplainResponse,
+    AIInsightsResponse,
     NLQuestionResponse,
     AIVisualizeResponse,
 )
@@ -373,26 +374,103 @@ class AIAnalystService:
     def generate_insights(
         self,
         dataset_id: str,
+        visual_spec: Optional[VisualizationSpec] = None,
         dashboard_id: Optional[str] = None,
         workspace_id: str = "default"
-    ) -> List[AIInsight]:
+    ) -> AIInsightsResponse:
         """
         Generates structured AI insights grounded in deterministic context.
         """
         status = self.check_availability()
         if not status.enabled or not self.provider:
-            raise HTTPException(status_code=503, detail=f"AI Analyst is unavailable: {status.message}")
+            raise HTTPException(status_code=503, detail=f"AI Analyst is currently unavailable or disabled: {status.message}")
 
         context = self.build_bounded_context(dataset_id=dataset_id, workspace_id=workspace_id, dashboard_id=dashboard_id)
         if not context.get("dataset_id"):
-            raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found.")
+            raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found in workspace '{workspace_id}'.")
 
-        raw_insights = self.provider.generate_insights(context, bounded_data=None)
-        validated_insights: List[AIInsight] = []
-        for ri in raw_insights:
+        # Determine query dimensions and measures from visual_spec or context columns
+        dims = []
+        measures = []
+        if visual_spec:
+            dims = visual_spec.dimensions
+            measures = visual_spec.measures
+        else:
+            all_cols = context.get("columns", [])
+            dim_cols = [c["name"] for c in all_cols if c.get("semantic_type") in {"category", "dimension", "time", "date", "text"}]
+            meas_cols = [c["name"] for c in all_cols if c.get("semantic_type") in {"metric", "measure", "numeric", "number", "integer", "float"}]
+            if dim_cols:
+                dims = [DimensionSpec(field=dim_cols[0])]
+            if meas_cols:
+                measures = [MeasureSpec(field=meas_cols[0], aggregation="sum")]
+
+        pre_computed_facts = {}
+        bounded_rows = []
+        if dims and measures:
             try:
-                validated_insights.append(AIInsight(**ri))
-            except Exception as e:
-                logger.warning(f"Skipping malformed insight: {e}")
+                query_req = AnalyticsQueryRequest(
+                    dataset_id=dataset_id,
+                    dimensions=dims,
+                    measures=measures,
+                    limit=20
+                )
+                res = self.analytics_service.execute_query(query_req, workspace_id=workspace_id)
+                res_dict = res.model_dump()
+                bounded_rows = res_dict.get("data", [])[:20]
 
-        return validated_insights
+                dim_field = dims[0].field
+                meas_field = measures[0].field
+                valid_items = []
+                for r in bounded_rows:
+                    if isinstance(r, dict) and dim_field in r:
+                        meas_val = None
+                        if meas_field in r:
+                            meas_val = r[meas_field]
+                        else:
+                            for k, v in r.items():
+                                if k != dim_field and isinstance(v, (int, float)):
+                                    meas_val = v
+                                    break
+                        if meas_val is not None:
+                            try:
+                                val = float(meas_val)
+                                valid_items.append({"category": str(r[dim_field]), "val": val})
+                            except (ValueError, TypeError):
+                                pass
+
+                if valid_items:
+                    sorted_items = sorted(valid_items, key=lambda x: x["val"], reverse=True)
+                    pre_computed_facts["highest_item"] = sorted_items[0]
+                    pre_computed_facts["lowest_item"] = sorted_items[-1]
+                    if len(sorted_items) > 1:
+                        diff = round(sorted_items[0]["val"] - sorted_items[-1]["val"], 2)
+                        pre_computed_facts["largest_difference"] = {
+                            "top": sorted_items[0]["category"],
+                            "bottom": sorted_items[-1]["category"],
+                            "diff": diff
+                        }
+                    pre_computed_facts["ranking"] = [item["category"] for item in sorted_items[:3]]
+            except Exception as e:
+                logger.warning(f"Could not pre-compute deterministic facts for insights: {e}")
+
+        bounded_data = {
+            "row_count": len(bounded_rows),
+            "data": bounded_rows,
+            "pre_computed_facts": pre_computed_facts
+        }
+
+        try:
+            raw_insights = self.provider.generate_insights(context, bounded_data=bounded_data)
+            validated_insights: List[AIInsight] = []
+            if isinstance(raw_insights, list):
+                for ri in raw_insights:
+                    try:
+                        validated_insights.append(AIInsight(**ri))
+                    except Exception as ve:
+                        logger.warning(f"Rejecting invalid AI insight item: {ve}")
+
+            validated_insights = validated_insights[:5]
+            return AIInsightsResponse(dataset_id=dataset_id, insights=validated_insights)
+        except Exception as e:
+            logger.error(f"AI insights generation error: {e}")
+            raise HTTPException(status_code=422, detail=f"AI insights response malformed: {str(e)}")

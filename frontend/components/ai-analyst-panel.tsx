@@ -597,20 +597,36 @@ export function AIAnalystPanel({ datasetId, dashboardId, onApproveVisual }: AIAn
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-slate-300">
-              Generate structured AI insights grounded in deterministic dataset profiling.
+              Generate structured AI insights grounded in deterministic analytics.
             </p>
-            <button
-              onClick={handleGetInsights}
-              disabled={!isAIEnabled || insightsLoading || !datasetId}
-              className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-medium rounded-lg text-sm transition-colors"
-            >
-              {insightsLoading ? "Analyzing..." : "Generate Insights"}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleGetInsights}
+                disabled={!isAIEnabled || insightsLoading || !datasetId}
+                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-medium rounded-lg text-sm transition-colors"
+              >
+                {insightsLoading ? "Analyzing..." : "Generate Insights"}
+              </button>
+              {insights.length > 0 && (
+                <button
+                  onClick={() => setInsights([])}
+                  className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg"
+                >
+                  Dismiss
+                </button>
+              )}
+            </div>
           </div>
 
           {insightsError && (
             <div className="p-3 bg-rose-950/40 border border-rose-500/40 rounded-lg text-rose-300 text-sm">
               {insightsError}
+            </div>
+          )}
+
+          {!insightsLoading && !insightsError && insights.length === 0 && (
+            <div className="p-6 text-center border border-slate-800/80 rounded-xl bg-slate-950/50">
+              <p className="text-sm text-slate-400">No notable insights found for this visual.</p>
             </div>
           )}
 
@@ -620,13 +636,22 @@ export function AIAnalystPanel({ datasetId, dashboardId, onApproveVisual }: AIAn
                 <div key={i} className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 font-semibold border border-cyan-500/20 uppercase">
-                      {ins.type}
+                      {ins.type.replace("_", " ")}
                     </span>
+                    {ins.severity && (
+                      <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
+                        ins.severity === "notable"
+                          ? "bg-amber-500/10 text-amber-400 border border-amber-500/30"
+                          : "bg-slate-800 text-slate-400"
+                      }`}>
+                        {ins.severity}
+                      </span>
+                    )}
                   </div>
                   <h4 className="font-semibold text-slate-100 text-base">{ins.title}</h4>
-                  <p className="text-sm text-slate-300">{ins.summary}</p>
+                  <p className="text-sm text-slate-300">{ins.description || ins.summary}</p>
                   {ins.evidence && ins.evidence.length > 0 && (
-                    <div className="space-y-1 pt-1">
+                    <div className="space-y-1 pt-1 border-t border-slate-900">
                       <span className="text-xs font-semibold text-slate-400">Grounded Evidence:</span>
                       <ul className="list-disc list-inside text-xs text-slate-400 space-y-0.5">
                         {ins.evidence.map((ev, ei) => (

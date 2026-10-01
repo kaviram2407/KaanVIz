@@ -9,7 +9,7 @@ from app.models.dataset import Dataset, DatasetVersion, DatasetColumn
 from app.services.ai_provider import MockAIProvider
 from app.services.ai_analyst_service import AIAnalystService
 from app.services.ingestion_service import CSVIngestionService
-from app.schemas.ai import AIExplainResponse
+from app.schemas.ai import AIExplainResponse, AIInsight, AIInsightsResponse
 
 client = TestClient(app)
 
@@ -471,4 +471,127 @@ def test_ai_explain_response_schema_rejections():
             summary="A" * 2500,
             observations=["Obs 1"]
         )
+
+
+def test_ai_insights_valid_request_and_pre_computed_facts(db: Session):
+    csv_bytes = b"category,revenue\nElectronics,12500\nClothing,8400\nBooks,3100\n"
+    ingestion = CSVIngestionService(db)
+    ds = ingestion.ingest_csv(file_bytes=csv_bytes, original_filename="exp_sales.csv", workspace_id="default", dataset_name="Exp Sales")
+
+    with patch.object(settings, "AI_ENABLED", True), \
+         patch.object(settings, "AI_PROVIDER", "mock"):
+
+        res = client.post("/api/v1/ai/insights", json={
+            "dataset_id": ds.id,
+            "visual_spec": {
+                "chart_type": "bar",
+                "dimensions": [{"field": "category"}],
+                "measures": [{"field": "revenue", "aggregation": "sum"}]
+            },
+            "workspace_id": "default"
+        })
+
+        assert res.status_code == 200
+        data = res.json()
+        assert "insights" in data
+        insights = data["insights"]
+        assert len(insights) > 0
+        assert len(insights) <= 5
+
+        types = [i["type"] for i in insights]
+        assert "highest_value" in types
+        assert "lowest_value" in types
+        assert "largest_difference" in types
+
+
+def test_ai_insights_schema_strict_validations():
+    # Valid insight succeeds
+    ins = AIInsight(
+        type="highest_value",
+        title="Top Category",
+        description="Electronics generated highest revenue.",
+        severity="notable",
+        evidence=["Electronics = 12500"],
+        related_fields=["category", "revenue"]
+    )
+    assert ins.type == "highest_value"
+    assert ins.severity == "notable"
+
+    # Invalid insight type rejected
+    with pytest.raises(ValueError, match="Invalid insight type"):
+        AIInsight(
+            type="unsupported_type",
+            title="Title",
+            description="Description"
+        )
+
+    # Invalid severity rejected
+    with pytest.raises(ValueError, match="Invalid severity"):
+        AIInsight(
+            type="highest_value",
+            title="Title",
+            description="Description",
+            severity="critical_alarm"
+        )
+
+    # HTML/Script rejection in insight description
+    with pytest.raises(ValueError, match="Unsafe HTML/Script content detected"):
+        AIInsight(
+            type="highest_value",
+            title="Title",
+            description="<script>alert(1)</script>"
+        )
+
+    # SQL injection rejection in insight description
+    with pytest.raises(ValueError, match="Arbitrary SQL statements detected"):
+        AIInsight(
+            type="highest_value",
+            title="Title",
+            description="The chart shows DROP TABLE users;"
+        )
+
+    # Executable code injection rejection
+    with pytest.raises(ValueError, match="Executable code constructs detected"):
+        AIInsight(
+            type="highest_value",
+            title="Title",
+            description="eval('document.cookie')"
+        )
+
+    # Excessive insight count (> 5) rejected by AIInsightsResponse
+    valid_items = [
+        AIInsight(type="highest_value", title=f"Title {i}", description=f"Desc {i}")
+        for i in range(6)
+    ]
+    with pytest.raises(ValueError, match="Excessive insight count"):
+        AIInsightsResponse(dataset_id="ds_1", insights=valid_items)
+
+
+def test_ai_insights_workspace_isolation(db: Session):
+    csv_bytes = b"category,revenue\nElectronics,1000\n"
+    ingestion = CSVIngestionService(db)
+    ds = ingestion.ingest_csv(file_bytes=csv_bytes, original_filename="ws_a_file.csv", workspace_id="ws_a", dataset_name="WS A Data")
+
+    with patch.object(settings, "AI_ENABLED", True), \
+         patch.object(settings, "AI_PROVIDER", "mock"):
+
+        # Attempting to access ws_a dataset from ws_b must fail (404)
+        res = client.post("/api/v1/ai/insights", json={
+            "dataset_id": ds.id,
+            "workspace_id": "ws_b"
+        })
+
+        assert res.status_code == 404
+        assert "not found" in res.json()["detail"].lower()
+
+
+def test_ai_insights_ai_disabled(db: Session):
+    with patch.object(settings, "AI_ENABLED", False):
+        res = client.post("/api/v1/ai/insights", json={
+            "dataset_id": "ds_dummy",
+            "workspace_id": "default"
+        })
+
+        assert res.status_code == 503
+        assert "unavailable" in res.json()["detail"].lower() or "disabled" in res.json()["detail"].lower()
 
