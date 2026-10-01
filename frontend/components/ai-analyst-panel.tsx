@@ -665,20 +665,32 @@ export function AIAnalystPanel({ datasetId, dashboardId, onApproveVisual }: AIAn
           )}
 
           {explainResult && (
-            <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4">
-              <h3 className="text-lg font-bold text-slate-100">{explainResult.title}</h3>
-
-              <div className="space-y-2">
-                <h4 className="text-sm font-semibold text-cyan-400">What This Visual Shows</h4>
-                <p className="text-sm text-slate-300">{explainResult.what_visual_shows}</p>
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 space-y-4 shadow-lg">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 className="text-lg font-bold text-slate-100">{explainResult.title}</h3>
+                <button
+                  onClick={() => setExplainResult(null)}
+                  className="px-3 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-md transition-colors"
+                  aria-label="Dismiss Explanation"
+                >
+                  Dismiss Explanation
+                </button>
               </div>
 
-              {explainResult.observed_patterns && explainResult.observed_patterns.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-xs font-semibold text-cyan-400 uppercase tracking-wider">Summary</h4>
+                <p className="text-sm text-slate-300 leading-relaxed">
+                  {explainResult.summary || explainResult.what_visual_shows}
+                </p>
+              </div>
+
+              {((explainResult.observations && explainResult.observations.length > 0) ||
+                (explainResult.observed_patterns && explainResult.observed_patterns.length > 0)) && (
                 <div className="space-y-2">
-                  <h4 className="text-sm font-semibold text-emerald-400">Observed Patterns</h4>
+                  <h4 className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Key Observations</h4>
                   <ul className="list-disc list-inside text-sm text-slate-300 space-y-1">
-                    {explainResult.observed_patterns.map((pt, pi) => (
-                      <li key={pi}>{pt}</li>
+                    {(explainResult.observations || explainResult.observed_patterns || []).slice(0, 5).map((obs, idx) => (
+                      <li key={idx} className="leading-normal">{obs}</li>
                     ))}
                   </ul>
                 </div>
@@ -686,8 +698,8 @@ export function AIAnalystPanel({ datasetId, dashboardId, onApproveVisual }: AIAn
 
               {explainResult.limitations_and_context && explainResult.limitations_and_context.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="text-sm font-semibold text-amber-400">Limitations & Context</h4>
-                  <ul className="list-disc list-inside text-sm text-slate-300 space-y-1">
+                  <h4 className="text-xs font-semibold text-amber-400 uppercase tracking-wider">Context & Bounds</h4>
+                  <ul className="list-disc list-inside text-xs text-slate-400 space-y-1">
                     {explainResult.limitations_and_context.map((lm, li) => (
                       <li key={li}>{lm}</li>
                     ))}

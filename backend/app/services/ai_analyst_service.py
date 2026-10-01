@@ -330,31 +330,44 @@ class AIAnalystService:
     ) -> AIExplainResponse:
         """
         Generates structured explanation for a given visualization.
+        Enforces workspace isolation and bounded deterministic context.
         """
         status = self.check_availability()
         if not status.enabled or not self.provider:
-            raise HTTPException(status_code=503, detail=f"AI Analyst is unavailable: {status.message}")
+            raise HTTPException(status_code=503, detail=f"AI Analyst is currently unavailable or disabled: {status.message}")
 
         context = self.build_bounded_context(dataset_id=dataset_id, workspace_id=workspace_id, dashboard_id=dashboard_id)
+        if not context.get("dataset_id"):
+            raise HTTPException(status_code=404, detail=f"Dataset '{dataset_id}' not found in workspace '{workspace_id}'.")
 
-        # Run query to get bounded analytics results
+        # Run deterministic query to get bounded analytics results
         query_req = AnalyticsQueryRequest(
             dataset_id=dataset_id,
             dimensions=visual_spec.dimensions,
             measures=visual_spec.measures,
-            limit=50
+            limit=20
         )
         bounded_result = {}
         try:
             res = self.analytics_service.execute_query(query_req, workspace_id=workspace_id)
-            bounded_result = res.model_dump()
+            res_dict = res.model_dump()
+            # Bound data rows and string lengths strictly for LLM context
+            if "data" in res_dict and isinstance(res_dict["data"], list):
+                res_dict["data"] = res_dict["data"][:20]
+                for row in res_dict["data"]:
+                    if isinstance(row, dict):
+                        for k, v in row.items():
+                            if isinstance(v, str) and len(v) > 100:
+                                row[k] = v[:100] + "..."
+            bounded_result = res_dict
         except Exception as e:
             logger.warning(f"Could not execute query for visual explanation: {e}")
 
-        raw_exp = self.provider.explain_visual(visual_spec.model_dump(), bounded_result, context)
         try:
+            raw_exp = self.provider.explain_visual(visual_spec.model_dump(), bounded_result, context)
             return AIExplainResponse(**raw_exp)
         except Exception as e:
+            logger.error(f"AI explanation validation error: {e}")
             raise HTTPException(status_code=422, detail=f"AI explanation payload malformed: {str(e)}")
 
     def generate_insights(

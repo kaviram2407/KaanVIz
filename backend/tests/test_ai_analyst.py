@@ -8,6 +8,8 @@ from app.core.config import settings
 from app.models.dataset import Dataset, DatasetVersion, DatasetColumn
 from app.services.ai_provider import MockAIProvider
 from app.services.ai_analyst_service import AIAnalystService
+from app.services.ingestion_service import CSVIngestionService
+from app.schemas.ai import AIExplainResponse
 
 client = TestClient(app)
 
@@ -327,4 +329,146 @@ def test_nvidia_provider_malformed_response(db: Session):
             detail = res.json()["detail"]
             assert "validation failed" in detail.lower() or "formatting error" in detail.lower()
             assert SECRET_KEY not in str(res.json())
+
+
+def test_explain_visual_valid_request(db: Session):
+    csv_bytes = b"category,sales\nElectronics,1000\nFurniture,500\n"
+    ingestion = CSVIngestionService(db)
+    ds = ingestion.ingest_csv(file_bytes=csv_bytes, original_filename="exp_sales.csv", workspace_id="default", dataset_name="Explain Sales")
+
+    with patch.object(settings, "AI_ENABLED", True), \
+         patch.object(settings, "AI_PROVIDER", "mock"):
+
+        res = client.post("/api/v1/ai/explain", json={
+            "visual_spec": {
+                "chart_type": "bar",
+                "title": "Sales by Category",
+                "dimensions": [{"field": "category"}],
+                "measures": [{"field": "sales", "aggregation": "sum"}]
+            },
+            "dataset_id": ds.id,
+            "workspace_id": "default"
+        })
+
+        assert res.status_code == 200
+        data = res.json()
+        assert "title" in data
+        assert "summary" in data
+        assert "observations" in data
+        assert isinstance(data["observations"], list)
+        assert len(data["observations"]) <= 5
+        assert "nvapi" not in str(data)
+
+
+def test_explain_visual_workspace_isolation(db: Session):
+    csv_bytes = b"category,sales\nElectronics,1000\n"
+    ingestion = CSVIngestionService(db)
+    ds = ingestion.ingest_csv(file_bytes=csv_bytes, original_filename="ws_b_sales.csv", workspace_id="workspace_b", dataset_name="WS B Sales")
+
+    with patch.object(settings, "AI_ENABLED", True), \
+         patch.object(settings, "AI_PROVIDER", "mock"):
+
+        # Attempt to access workspace_b dataset from default workspace
+        res = client.post("/api/v1/ai/explain", json={
+            "visual_spec": {
+                "chart_type": "bar",
+                "dimensions": [{"field": "category"}],
+                "measures": [{"field": "sales", "aggregation": "sum"}]
+            },
+            "dataset_id": ds.id,
+            "workspace_id": "default"
+        })
+
+        assert res.status_code == 404
+        assert "not found" in res.json()["detail"].lower()
+
+
+def test_explain_visual_ai_disabled(db: Session):
+    with patch.object(settings, "AI_ENABLED", False):
+        res = client.post("/api/v1/ai/explain", json={
+            "visual_spec": {
+                "chart_type": "bar",
+                "dimensions": [{"field": "category"}],
+                "measures": [{"field": "sales", "aggregation": "sum"}]
+            },
+            "dataset_id": "ds_dummy",
+            "workspace_id": "default"
+        })
+
+        assert res.status_code == 503
+        assert "unavailable" in res.json()["detail"].lower() or "disabled" in res.json()["detail"].lower()
+
+
+def test_explain_visual_prompt_injection_and_sanitization(db: Session):
+    csv_bytes = b"category,sales\n<script>alert(1)</script>,1000\n"
+    ingestion = CSVIngestionService(db)
+    ds = ingestion.ingest_csv(file_bytes=csv_bytes, original_filename="inj_exp.csv", workspace_id="default", dataset_name="Inj Exp")
+
+    with patch.object(settings, "AI_ENABLED", True), \
+         patch.object(settings, "AI_PROVIDER", "mock"):
+
+        res = client.post("/api/v1/ai/explain", json={
+            "visual_spec": {
+                "chart_type": "bar",
+                "dimensions": [{"field": "category"}],
+                "measures": [{"field": "sales", "aggregation": "sum"}]
+            },
+            "dataset_id": ds.id,
+            "workspace_id": "default"
+        })
+
+        assert res.status_code == 200
+        data = res.json()
+        assert "<script>" not in str(data)
+
+
+def test_ai_explain_response_schema_rejections():
+    # Valid natural language explanation succeeds
+    valid_resp = AIExplainResponse(
+        title="Revenue Chart",
+        summary="The bar chart shows revenue by category.",
+        observations=["Electronics is highest", "Books is lowest"]
+    )
+    assert valid_resp.summary == "The bar chart shows revenue by category."
+    assert len(valid_resp.observations) == 2
+
+    # HTML/Script injection in AI response must be rejected
+    with pytest.raises(ValueError, match="Unsafe HTML/Script content detected"):
+        AIExplainResponse(
+            title="Malicious Chart",
+            summary="<script>alert('xss')</script>",
+            observations=["Normal observation"]
+        )
+
+    # SQL injection in AI response must be rejected
+    with pytest.raises(ValueError, match="Arbitrary SQL statements detected"):
+        AIExplainResponse(
+            title="SQL Injection Chart",
+            summary="The chart shows SELECT * FROM users;",
+            observations=["Observation"]
+        )
+
+    # Executable code injection in AI response must be rejected
+    with pytest.raises(ValueError, match="Executable code constructs detected"):
+        AIExplainResponse(
+            title="Code Injection Chart",
+            summary="Normal summary",
+            observations=["eval(document.cookie)"]
+        )
+
+    # Excessive observation count must be rejected
+    with pytest.raises(ValueError, match="Excessive observation count"):
+        AIExplainResponse(
+            title="Excessive Observations Chart",
+            summary="Normal summary",
+            observations=[f"Obs {i}" for i in range(15)]
+        )
+
+    # Excessive text length must be rejected
+    with pytest.raises(ValueError, match="Excessive text length"):
+        AIExplainResponse(
+            title="Long Summary Chart",
+            summary="A" * 2500,
+            observations=["Obs 1"]
+        )
 

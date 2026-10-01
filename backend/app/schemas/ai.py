@@ -1,5 +1,5 @@
 from typing import List, Dict, Any, Optional
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 from app.schemas.analytics import (
     DimensionSpec,
     MeasureSpec,
@@ -67,15 +67,79 @@ class AIInsight(BaseModel):
     related_fields: List[str] = Field(default_factory=list, description="Dataset fields involved")
 
 
+import re
+
+FORBIDDEN_HTML_SCRIPT_RE = re.compile(
+    r"<\s*/?\s*(script|iframe|style|applet|object|embed|svg|body|html|link|meta)\b|javascript:|onload\s*=|onerror\s*=|onclick\s*=",
+    re.IGNORECASE,
+)
+FORBIDDEN_SQL_RE = re.compile(
+    r"\b(SELECT\s+(\*|[a-z0-9_,\s]+)\s+FROM|DROP\s+TABLE|INSERT\s+INTO|DELETE\s+FROM|ALTER\s+TABLE|UNION\s+SELECT|EXEC\s*\()\b",
+    re.IGNORECASE,
+)
+FORBIDDEN_CODE_RE = re.compile(
+    r"\b(eval\s*\(|exec\s*\(|system\s*\(|process\.exit|__import__|function\s*\()\b",
+    re.IGNORECASE,
+)
+
+def validate_safe_text(text: str, field_name: str) -> str:
+    if not text:
+        return text
+    if FORBIDDEN_HTML_SCRIPT_RE.search(text):
+        raise ValueError(f"Unsafe HTML/Script content detected in AI output field '{field_name}'")
+    if FORBIDDEN_SQL_RE.search(text):
+        raise ValueError(f"Arbitrary SQL statements detected in AI output field '{field_name}'")
+    if FORBIDDEN_CODE_RE.search(text):
+        raise ValueError(f"Executable code constructs detected in AI output field '{field_name}'")
+    if len(text) > 2000:
+        raise ValueError(f"Excessive text length ({len(text)} chars) in AI output field '{field_name}'")
+    return text
+
+
 class AIExplainResponse(BaseModel):
     title: str = Field(..., description="Title of explained visualization")
-    what_visual_shows: str = Field(..., description="Summary of what the visual presents")
+    summary: str = Field(..., description="Concise grounded summary of what the visual shows")
+    observations: List[str] = Field(default_factory=list, description="Bounded list of concise observations (max 5)")
     dimensions_used: List[str] = Field(default_factory=list)
     measures_used: List[str] = Field(default_factory=list)
     aggregations_used: List[str] = Field(default_factory=list)
-    observed_patterns: List[str] = Field(default_factory=list)
+    what_visual_shows: Optional[str] = Field(None, description="Alias for summary")
+    observed_patterns: List[str] = Field(default_factory=list, description="Alias for observations")
     limitations_and_context: List[str] = Field(default_factory=list)
     suggested_improvements: Optional[List[str]] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_and_sync_explanation(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            # Check title
+            title = data.get("title") or "Visualization Explanation"
+            if isinstance(title, str):
+                validate_safe_text(title, "title")
+            data["title"] = title
+
+            # Sync summary <-> what_visual_shows
+            s = data.get("summary") or data.get("what_visual_shows") or "Visualization Explanation"
+            if isinstance(s, str):
+                validate_safe_text(s, "summary")
+            data["summary"] = s
+            data["what_visual_shows"] = s
+
+            # Sync observations <-> observed_patterns
+            obs = data.get("observations") or data.get("observed_patterns") or []
+            if isinstance(obs, list):
+                if len(obs) > 10:
+                    raise ValueError(f"Excessive observation count ({len(obs)}) in AI output")
+                validated_obs = []
+                for idx, item in enumerate(obs):
+                    if isinstance(item, str) and item.strip():
+                        validate_safe_text(item, f"observations[{idx}]")
+                        validated_obs.append(item.strip())
+                validated_obs = validated_obs[:5]
+                data["observations"] = validated_obs
+                data["observed_patterns"] = validated_obs
+
+        return data
 
 
 class NLQuestionRequest(BaseModel):

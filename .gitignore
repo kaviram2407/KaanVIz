@@ -35,14 +35,14 @@ venv/
 ENV/
 
 # DuckDB / Parquet / Local Storage
-storage/raw/*
-!storage/raw/.gitkeep
-storage/processed/*
-!storage/processed/.gitkeep
-storage/metadata/*
-!storage/metadata/.gitkeep
-storage/exports/*
-!storage/exports/.gitkeep
+**/storage/raw/*
+!**/storage/raw/.gitkeep
+**/storage/processed/*
+!**/storage/processed/.gitkeep
+**/storage/metadata/*
+!**/storage/metadata/.gitkeep
+**/storage/exports/*
+!**/storage/exports/.gitkeep
 *.db
 *.duckdb
 *.parquet
@@ -53,6 +53,7 @@ node_modules/
 out/
 .vercel
 *.log
+*.tsbuildinfo
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

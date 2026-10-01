@@ -9,7 +9,8 @@ import {
   executeAnalyticsQuery,
 } from "@/lib/api-client";
 import { VisualizationChart } from "@/components/visualization-chart";
-import { Trash2, Move, Filter } from "lucide-react";
+import { Trash2, Move, Filter, Sparkles } from "lucide-react";
+import { explainAIVisual, AIExplainResponse } from "@/lib/ai-api";
 
 interface DashboardItemWidgetProps {
   item: DashboardItemResponse;
@@ -36,7 +37,29 @@ export function DashboardItemWidget({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [explainResult, setExplainResult] = useState<AIExplainResponse | null>(null);
+  const [explainLoading, setExplainLoading] = useState(false);
+  const [explainError, setExplainError] = useState<string | null>(null);
+
   const spec = item.visualization_spec as VisualizationSpec;
+
+  const handleExplain = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!item.dataset_id) return;
+    setExplainLoading(true);
+    setExplainError(null);
+    try {
+      const res = await explainAIVisual({
+        visual_spec: spec,
+        dataset_id: item.dataset_id,
+      });
+      setExplainResult(res);
+    } catch (err: any) {
+      setExplainError(err.message || "Failed to explain visual.");
+    } finally {
+      setExplainLoading(false);
+    }
+  };
 
   useEffect(() => {
     runWidgetQuery();
@@ -129,6 +152,17 @@ export function DashboardItemWidget({
               Filtered
             </span>
           )}
+          {item.dataset_id && (
+            <button
+              onClick={handleExplain}
+              disabled={explainLoading}
+              className="p-1 text-slate-400 hover:text-cyan-400 disabled:opacity-50 rounded transition-colors flex items-center gap-1 text-[10px]"
+              title="Explain this visual using AI Analyst"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+              {explainLoading ? "Explaining..." : "Explain"}
+            </button>
+          )}
           {isEditing && (
             <button
               onClick={(e) => {
@@ -151,6 +185,43 @@ export function DashboardItemWidget({
         isLoading={isLoading}
         error={error}
       />
+
+      {/* Explain Visual Result Overlay */}
+      {explainError && (
+        <div className="p-2 bg-rose-950/60 border border-rose-500/40 rounded text-rose-300 text-xs flex items-center justify-between">
+          <span>{explainError}</span>
+          <button onClick={() => setExplainError(null)} className="text-slate-400 hover:text-slate-200">×</button>
+        </div>
+      )}
+
+      {explainResult && (
+        <div className="bg-slate-950/95 border border-cyan-500/40 rounded-lg p-3 space-y-2 text-xs shadow-xl relative z-10">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+            <span className="font-bold text-slate-200 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+              {explainResult.title}
+            </span>
+            <button
+              onClick={() => setExplainResult(null)}
+              className="text-slate-400 hover:text-slate-200 text-xs px-1.5 py-0.5 rounded bg-slate-800"
+              aria-label="Dismiss Explanation"
+            >
+              Dismiss
+            </button>
+          </div>
+          <p className="text-slate-300 leading-normal">
+            {explainResult.summary || explainResult.what_visual_shows}
+          </p>
+          {((explainResult.observations && explainResult.observations.length > 0) ||
+            (explainResult.observed_patterns && explainResult.observed_patterns.length > 0)) && (
+            <ul className="list-disc list-inside text-slate-300 space-y-0.5 pt-1 border-t border-slate-900">
+              {(explainResult.observations || explainResult.observed_patterns || []).slice(0, 5).map((obs, idx) => (
+                <li key={idx}>{obs}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }
