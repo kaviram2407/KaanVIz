@@ -7,7 +7,9 @@ interface PlaceholderStateProps {
   title: string;
   description: string;
   icon: LucideIcon;
-  targetPhase: string;
+  targetPhase?: string;
+  statusBadge?: string;
+  notice?: string;
 }
 
 export function PlaceholderState({
@@ -15,7 +17,12 @@ export function PlaceholderState({
   description,
   icon: Icon,
   targetPhase,
+  statusBadge = "Future Release",
+  notice,
 }: PlaceholderStateProps) {
+  const badgeLabel = statusBadge || (targetPhase ? `Planned for ${targetPhase}` : "Future Release");
+  const noticeContent = notice || description;
+
   return (
     <div className="flex flex-col items-center justify-center py-12 px-4">
       <Card className="max-w-md text-center border-dashed border-2">
@@ -25,7 +32,7 @@ export function PlaceholderState({
           </div>
           <CardTitle className="text-xl">{title}</CardTitle>
           <Badge variant="outline" className="mt-1">
-            Planned for {targetPhase}
+            {badgeLabel}
           </Badge>
         </CardHeader>
         <CardContent>
@@ -33,8 +40,8 @@ export function PlaceholderState({
             {description}
           </CardDescription>
           <div className="mt-4 p-3 bg-muted rounded-md text-xs text-muted-foreground text-left">
-            <p className="font-semibold mb-1 text-foreground">Phase 1 Boundary Notice:</p>
-            This route is intentionally non-functional during Phase 1 Setup. Implementation will occur according to the KaanViz roadmap sequence.
+            <p className="font-semibold mb-1 text-foreground">Notice:</p>
+            {noticeContent}
           </div>
         </CardContent>
       </Card>
