@@ -47,7 +47,7 @@ describe('Phase 8 — Frontend AI Analyst Tests', () => {
     vi.mocked(aiApi.fetchAIStatus).mockResolvedValueOnce({
       enabled: true,
       provider: 'nvidia',
-      model: 'nvidia/nemotron-3.5-lightning-30b-a3b',
+      model: 'nvidia/nemotron-3-super-120b-a12b',
       status: 'enabled',
       configured: true,
     });
@@ -56,7 +56,7 @@ describe('Phase 8 — Frontend AI Analyst Tests', () => {
 
     await waitFor(() => {
       expect(screen.getAllByText(/nvidia/i).length).toBeGreaterThan(0);
-      expect(screen.getByText('nvidia/nemotron-3.5-lightning-30b-a3b')).toBeInTheDocument();
+      expect(screen.getByText('nvidia/nemotron-3-super-120b-a12b')).toBeInTheDocument();
       const switchBtn = screen.getByRole('switch', { name: /Toggle AI Analyst Enabled State/i });
       expect(switchBtn).toBeInTheDocument();
       expect(switchBtn).toHaveAttribute('aria-checked', 'true');
@@ -70,7 +70,7 @@ describe('Phase 8 — Frontend AI Analyst Tests', () => {
     vi.mocked(aiApi.fetchAIStatus).mockResolvedValueOnce({
       enabled: true,
       provider: 'nvidia',
-      model: 'nvidia/nemotron-3.5-lightning-30b-a3b',
+      model: 'nvidia/nemotron-3-super-120b-a12b',
       status: 'enabled',
       configured: true,
     });
@@ -78,7 +78,7 @@ describe('Phase 8 — Frontend AI Analyst Tests', () => {
     vi.mocked(aiApi.toggleAIStatus).mockResolvedValueOnce({
       enabled: false,
       provider: 'nvidia',
-      model: 'nvidia/nemotron-3.5-lightning-30b-a3b',
+      model: 'nvidia/nemotron-3-super-120b-a12b',
       status: 'disabled',
       configured: false,
     });
@@ -101,7 +101,7 @@ describe('Phase 8 — Frontend AI Analyst Tests', () => {
     vi.mocked(aiApi.fetchAIStatus).mockResolvedValue({
       enabled: true,
       provider: 'nvidia',
-      model: 'nvidia/nemotron-3.5-lightning-30b-a3b',
+      model: 'nvidia/nemotron-3-super-120b-a12b',
       status: 'enabled',
       configured: true,
     });
@@ -109,7 +109,7 @@ describe('Phase 8 — Frontend AI Analyst Tests', () => {
     vi.mocked(aiApi.testAIConnection).mockResolvedValueOnce({
       success: true,
       provider: 'nvidia',
-      model: 'nvidia/nemotron-3.5-lightning-30b-a3b',
+      model: 'nvidia/nemotron-3-super-120b-a12b',
       configured: true,
       message: 'Successfully connected to NVIDIA Nemotron API.',
     });

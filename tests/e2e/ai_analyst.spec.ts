@@ -29,7 +29,7 @@ test.describe('Phase 8 — E2E AI Analyst Verification', () => {
     // Verify active Provider & Model display
     await expect(page.locator('body')).toContainText(/Provider:/i);
     await expect(page.locator('body')).toContainText(/NVIDIA/i);
-    await expect(page.locator('body')).toContainText(/nvidia\/nemotron-3.5-lightning-30b-a3b/i);
+    await expect(page.locator('body')).toContainText(/nvidia\/nemotron-3-super-120b-a12b/i);
 
     // Verify Test Connection button
     const testConnBtn = page.getByRole('button', { name: /Test Connection/i });
