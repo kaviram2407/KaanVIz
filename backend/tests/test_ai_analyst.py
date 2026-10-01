@@ -193,7 +193,7 @@ def test_nvidia_provider_selection():
         provider = get_ai_provider()
         assert isinstance(provider, NVIDIAProvider)
         assert provider.is_available() is True
-        assert provider.model == "nvidia/nemotron-3-super-120b-a12b"
+        assert provider.model == settings.NVIDIA_MODEL
 
 
 def test_nvidia_provider_missing_api_key():
@@ -212,6 +212,22 @@ def test_nvidia_provider_missing_api_key():
         assert test_res["configured"] is False
         assert "missing or not configured" in test_res["message"]
         assert "nvapi" not in str(test_res)
+
+
+def test_ai_toggle_endpoint():
+    with patch.object(settings, "AI_ENABLED", True):
+        # Toggle off
+        res_off = client.post("/api/v1/ai/toggle", json={"enabled": False})
+        assert res_off.status_code == 200
+        data_off = res_off.json()
+        assert data_off["enabled"] is False
+        assert data_off["status"] == "disabled"
+
+        # Toggle on
+        res_on = client.post("/api/v1/ai/toggle", json={"enabled": True})
+        assert res_on.status_code == 200
+        data_on = res_on.json()
+        assert data_on["enabled"] is True
 
 
 def test_nvidia_provider_successful_connection_mocked():
@@ -235,7 +251,7 @@ def test_nvidia_provider_successful_connection_mocked():
             data = res.json()
             assert data["success"] is True
             assert data["provider"] == "nvidia"
-            assert data["model"] == "nvidia/nemotron-3-super-120b-a12b"
+            assert data["model"] == settings.NVIDIA_MODEL
             assert data["configured"] is True
             assert SECRET_KEY not in str(data)
 

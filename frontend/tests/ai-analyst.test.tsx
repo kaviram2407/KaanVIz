@@ -17,6 +17,8 @@ vi.mock('@/lib/ai-api', async () => {
     generateAIVisualization: vi.fn(),
     explainAIVisual: vi.fn(),
     fetchAIInsights: vi.fn(),
+    testAIConnection: vi.fn(),
+    toggleAIStatus: vi.fn(),
   };
 });
 
@@ -38,6 +40,91 @@ describe('Phase 8 — Frontend AI Analyst Tests', () => {
     await waitFor(() => {
       expect(screen.getByText(/AI Analyst is currently unavailable or disabled/i)).toBeInTheDocument();
       expect(screen.getByText(/AI Disabled \/ Unconfigured/i)).toBeInTheDocument();
+    });
+  });
+
+  it('renders active provider, model name, and toggle switch accessibility', async () => {
+    vi.mocked(aiApi.fetchAIStatus).mockResolvedValueOnce({
+      enabled: true,
+      provider: 'nvidia',
+      model: 'nvidia/nemotron-3.5-lightning-30b-a3b',
+      status: 'enabled',
+      configured: true,
+    });
+
+    render(<AIAnalystPanel datasetId="ds-1" />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/nvidia/i).length).toBeGreaterThan(0);
+      expect(screen.getByText('nvidia/nemotron-3.5-lightning-30b-a3b')).toBeInTheDocument();
+      const switchBtn = screen.getByRole('switch', { name: /Toggle AI Analyst Enabled State/i });
+      expect(switchBtn).toBeInTheDocument();
+      expect(switchBtn).toHaveAttribute('aria-checked', 'true');
+    });
+
+    // Verify secret key non-disclosure in DOM
+    expect(document.body.innerHTML).not.toContain('nvapi-');
+  });
+
+  it('supports toggling AI status via toggleAIStatus API call', async () => {
+    vi.mocked(aiApi.fetchAIStatus).mockResolvedValueOnce({
+      enabled: true,
+      provider: 'nvidia',
+      model: 'nvidia/nemotron-3.5-lightning-30b-a3b',
+      status: 'enabled',
+      configured: true,
+    });
+
+    vi.mocked(aiApi.toggleAIStatus).mockResolvedValueOnce({
+      enabled: false,
+      provider: 'nvidia',
+      model: 'nvidia/nemotron-3.5-lightning-30b-a3b',
+      status: 'disabled',
+      configured: false,
+    });
+
+    render(<AIAnalystPanel datasetId="ds-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('switch')).toBeInTheDocument();
+    });
+
+    const switchBtn = screen.getByRole('switch');
+    fireEvent.click(switchBtn);
+
+    await waitFor(() => {
+      expect(aiApi.toggleAIStatus).toHaveBeenCalledWith(false);
+    });
+  });
+
+  it('executes Test Connection and displays success feedback banner', async () => {
+    vi.mocked(aiApi.fetchAIStatus).mockResolvedValue({
+      enabled: true,
+      provider: 'nvidia',
+      model: 'nvidia/nemotron-3.5-lightning-30b-a3b',
+      status: 'enabled',
+      configured: true,
+    });
+
+    vi.mocked(aiApi.testAIConnection).mockResolvedValueOnce({
+      success: true,
+      provider: 'nvidia',
+      model: 'nvidia/nemotron-3.5-lightning-30b-a3b',
+      configured: true,
+      message: 'Successfully connected to NVIDIA Nemotron API.',
+    });
+
+    render(<AIAnalystPanel datasetId="ds-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Test Connection/i })).toBeInTheDocument();
+    });
+
+    const testBtn = screen.getByRole('button', { name: /Test Connection/i });
+    fireEvent.click(testBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Connected: NVIDIA Nemotron is available\./i)).toBeInTheDocument();
     });
   });
 

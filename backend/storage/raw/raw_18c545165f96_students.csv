@@ -1,0 +1,4 @@
+id,name,score,is_valid
+101,Alice,95.5,true
+102,Bob,88.0,false
+103,Charlie,92.3,true

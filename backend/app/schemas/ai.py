@@ -31,6 +31,10 @@ class AITestConnectionResponse(BaseModel):
     message: str = Field(..., description="Detailed result or error message")
 
 
+class AIToggleRequest(BaseModel):
+    enabled: bool = Field(..., description="Desired AI status (True to enable, False to disable)")
+
+
 class AnalyticsQueryIntent(BaseModel):
     intent: str = Field("analytics_query", description="Intent type, e.g. 'analytics_query'")
     dataset_id: Optional[str] = Field(None, description="Target dataset ID")

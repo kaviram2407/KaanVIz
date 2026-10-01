@@ -22,9 +22,24 @@ test.describe('Phase 8 — E2E AI Analyst Verification', () => {
     await expect(page.getByTestId('upload-success-card')).toBeVisible({ timeout: 15000 });
   });
 
-  test('3. AI Analyst Page loads and checks AI availability status', async ({ page }) => {
+  test('3. AI Analyst Page loads and checks AI availability status, provider settings, and test connection', async ({ page }) => {
     await page.goto('/ai-analyst');
     await expect(page.locator('body')).toContainText(/AI Analyst/i, { timeout: 10000 });
+
+    // Verify active Provider & Model display
+    await expect(page.locator('body')).toContainText(/Provider:/i);
+    await expect(page.locator('body')).toContainText(/NVIDIA/i);
+    await expect(page.locator('body')).toContainText(/nvidia\/nemotron-3.5-lightning-30b-a3b/i);
+
+    // Verify Test Connection button
+    const testConnBtn = page.getByRole('button', { name: /Test Connection/i });
+    await expect(testConnBtn).toBeVisible();
+    await testConnBtn.click();
+    await expect(page.locator('body')).toContainText(/(Connected|Unavailable|Error)/i, { timeout: 10000 });
+
+    // Verify Accessible Toggle Switch
+    const toggleSwitch = page.getByRole('switch', { name: /Toggle AI Analyst Enabled State/i });
+    await expect(toggleSwitch).toBeVisible();
   });
 
   test('4. Ask NL Question, generate query intent, execute query, and review approval options', async ({ page }) => {

@@ -8,6 +8,7 @@ import {
   explainAIVisual,
   fetchAIInsights,
   testAIConnection,
+  toggleAIStatus,
   AIAvailabilityResponse,
   AITestConnectionResponse,
   NLQuestionResponse,
@@ -17,7 +18,7 @@ import {
   AIVisualizationSuggestion,
 } from "@/lib/ai-api";
 import { VisualizationChart } from "@/components/visualization-chart";
-import { Bot, Sparkles, HelpCircle, BarChart3, Lightbulb, Check, X, AlertTriangle, ShieldCheck, Activity, Cpu } from "lucide-react";
+import { Bot, Sparkles, HelpCircle, BarChart3, Lightbulb, Check, X, AlertTriangle, ShieldCheck, Activity, Cpu, Power } from "lucide-react";
 
 interface AIAnalystPanelProps {
   datasetId?: string;
@@ -28,6 +29,9 @@ interface AIAnalystPanelProps {
 export function AIAnalystPanel({ datasetId, dashboardId, onApproveVisual }: AIAnalystPanelProps) {
   const [aiStatus, setAiStatus] = useState<AIAvailabilityResponse | null>(null);
   const [activeTab, setActiveTab] = useState<"query" | "visualize" | "insights" | "explain">("query");
+
+  // Toggle AI State
+  const [toggleLoading, setToggleLoading] = useState(false);
 
   // Test Connection State
   const [testLoading, setTestLoading] = useState(false);
@@ -61,6 +65,21 @@ export function AIAnalystPanel({ datasetId, dashboardId, onApproveVisual }: AIAn
   useEffect(() => {
     fetchAIStatus().then(setAiStatus).catch(console.error);
   }, []);
+
+  const handleToggleAI = async () => {
+    if (!aiStatus) return;
+    setToggleLoading(true);
+    try {
+      const nextState = !aiStatus.enabled;
+      const updated = await toggleAIStatus(nextState);
+      setAiStatus(updated);
+      setTestResult(null);
+    } catch (err: any) {
+      console.error("Failed to toggle AI status:", err);
+    } finally {
+      setToggleLoading(false);
+    }
+  };
 
   const handleTestConnection = async () => {
     setTestLoading(true);
@@ -177,7 +196,7 @@ export function AIAnalystPanel({ datasetId, dashboardId, onApproveVisual }: AIAn
     setApprovalFeedback("Rejected AI suggestion.");
   };
 
-  const isAIEnabled = aiStatus?.status === "enabled";
+  const isAIEnabled = aiStatus?.status === "enabled" || aiStatus?.enabled === true;
 
   return (
     <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-6 shadow-xl space-y-6">
@@ -222,40 +241,85 @@ export function AIAnalystPanel({ datasetId, dashboardId, onApproveVisual }: AIAn
         </div>
       </div>
 
-      {/* Provider Details & Test Connection Bar */}
-      <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 text-xs">
+      {/* AI Provider Settings & Control Bar */}
+      <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 text-xs">
         <div className="flex flex-wrap items-center gap-6 text-slate-300">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <Cpu className="w-4 h-4 text-cyan-400" />
             <span className="text-slate-400 font-medium">Provider:</span>
-            <span className="font-semibold text-slate-100 uppercase tracking-wide">{aiStatus?.provider || "N/A"}</span>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-400 font-medium">Model:</span>
-            <span className="font-mono text-cyan-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-              {aiStatus?.model || "N/A"}
+            <span className="font-semibold text-slate-100 uppercase tracking-wide">
+              {aiStatus?.provider || "none"}
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-400 font-medium">Config:</span>
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400 font-medium">Model:</span>
+            <span className="font-mono text-cyan-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+              {aiStatus?.model || "none"}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400 font-medium">AI Status:</span>
+            <button
+              onClick={handleToggleAI}
+              disabled={toggleLoading}
+              role="switch"
+              aria-checked={isAIEnabled}
+              aria-label="Toggle AI Analyst Enabled State"
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 ${
+                isAIEnabled ? "bg-cyan-600" : "bg-slate-700"
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  isAIEnabled ? "translate-x-4" : "translate-x-0"
+                }`}
+              />
+            </button>
             <span
               className={`px-2 py-0.5 rounded font-semibold text-[11px] ${
-                aiStatus?.configured
+                isAIEnabled
                   ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
                   : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
               }`}
             >
-              {aiStatus?.configured ? "Configured" : "Not Configured"}
+              {isAIEnabled ? "Enabled" : "Disabled"}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400 font-medium">Connection:</span>
+            <span
+              className={`px-2 py-0.5 rounded font-semibold text-[11px] flex items-center gap-1 ${
+                !isAIEnabled
+                  ? "bg-slate-800 text-slate-400 border border-slate-700"
+                  : testResult
+                  ? testResult.success
+                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                    : "bg-rose-500/10 text-rose-400 border border-rose-500/30"
+                  : aiStatus?.configured
+                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                  : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
+              }`}
+            >
+              {!isAIEnabled
+                ? "Disabled"
+                : testResult
+                ? testResult.success
+                  ? "Connected"
+                  : "Unavailable"
+                : aiStatus?.configured
+                ? "Connected"
+                : "Not Connected"}
             </span>
           </div>
         </div>
 
         <button
           onClick={handleTestConnection}
-          disabled={testLoading}
-          className="px-3.5 py-1.5 bg-cyan-950/80 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-500/30 font-medium rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50"
+          disabled={testLoading || !isAIEnabled}
+          className="px-3.5 py-1.5 bg-cyan-950/80 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-500/30 font-medium rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-slate-900"
         >
           <Activity className="w-3.5 h-3.5 text-cyan-400" />
           {testLoading ? "Testing Connection..." : "Test Connection"}
@@ -273,7 +337,9 @@ export function AIAnalystPanel({ datasetId, dashboardId, onApproveVisual }: AIAn
         >
           <div className="flex items-center gap-2">
             {testResult.success ? <Check className="w-4 h-4 text-emerald-400" /> : <AlertTriangle className="w-4 h-4 text-rose-400" />}
-            <span>{testResult.message} (Provider: {testResult.provider}, Model: {testResult.model})</span>
+            <span>
+              {testResult.success ? "Connected: NVIDIA Nemotron is available." : `Unavailable: ${testResult.message}`} (Provider: {testResult.provider}, Model: {testResult.model})
+            </span>
           </div>
           <button onClick={() => setTestResult(null)} className="text-slate-400 hover:text-slate-200">
             <X className="w-3.5 h-3.5" />

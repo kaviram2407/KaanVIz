@@ -114,6 +114,18 @@ class AIAnalystService:
         res = provider.test_connection()
         return AITestConnectionResponse(**res)
 
+    def toggle_ai(self, enabled: bool) -> AIAvailabilityResponse:
+        """
+        Toggles application runtime AI_ENABLED settings configuration in backend memory.
+        Returns updated availability response.
+        """
+        settings.AI_ENABLED = enabled
+        if not enabled:
+            self.provider = None
+        else:
+            self.provider = get_ai_provider()
+        return self.check_availability()
+
     def build_bounded_context(
         self,
         dataset_id: Optional[str] = None,

@@ -14,6 +14,7 @@ def get_db():
 from app.schemas.ai import (
     AIAvailabilityResponse,
     AITestConnectionResponse,
+    AIToggleRequest,
     NLQuestionRequest,
     NLQuestionResponse,
     AIVisualizeRequest,
@@ -36,6 +37,19 @@ def get_ai_status(db: Session = Depends(get_db)):
     """
     service = AIAnalystService(db=db)
     return service.check_availability()
+
+
+@router.post("/toggle", response_model=AIAvailabilityResponse)
+def toggle_ai_status(
+    req: AIToggleRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Allows user to enable or disable AI Analyst functionality via runtime backend configuration.
+    Never exposes credentials or modifies database schemas.
+    """
+    service = AIAnalystService(db=db)
+    return service.toggle_ai(enabled=req.enabled)
 
 
 @router.post("/test-connection", response_model=AITestConnectionResponse)
