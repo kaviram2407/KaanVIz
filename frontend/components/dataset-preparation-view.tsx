@@ -264,15 +264,15 @@ export function DatasetPreparationView({
   };
 
   return (
-    <div className="space-y-6" data-testid="preparation-view">
+    <div className="space-y-6 font-sans" data-testid="preparation-view">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[var(--kaan-ink)] pb-4">
         <div>
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <Wrench className="w-5 h-5 text-indigo-500" />
+          <h2 className="text-lg font-mono font-bold uppercase tracking-wider text-[var(--kaan-ink)] flex items-center gap-2">
+            <Wrench className="w-5 h-5 text-[var(--kaan-green)]" />
             Data Preparation & Cleaning Workbench
           </h2>
-          <p className="text-sm text-slate-400 mt-1">
+          <p className="text-xs font-mono text-slate-600 mt-1">
             Build explicit, deterministic cleaning rules to produce a new prepared dataset version.
           </p>
         </div>
@@ -280,33 +280,33 @@ export function DatasetPreparationView({
 
       {/* Before vs After Comparison (If Applied) */}
       {metricsSummary && (
-        <div className="p-4 bg-emerald-950/40 border border-emerald-500/40 rounded-xl space-y-3">
-          <div className="flex items-center gap-2 text-emerald-400 font-medium">
+        <div className="p-4 bg-[var(--kaan-paper)] border border-[var(--kaan-ink)] shadow-[4px_4px_0_var(--kaan-ink)] font-mono space-y-3">
+          <div className="flex items-center gap-2 text-[var(--kaan-green)] font-bold text-sm uppercase">
             <CheckCircle className="w-5 h-5" />
             Preparation Plan Executed Successfully!
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-            <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
-              <span className="text-slate-400 text-xs block">Rows</span>
-              <span className="font-semibold text-slate-200">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono">
+            <div className="bg-[var(--kaan-cream)] p-3 border border-[var(--kaan-ink)] shadow-[2px_2px_0_var(--kaan-ink)]">
+              <span className="text-slate-500 text-[10px] uppercase font-bold block">Rows</span>
+              <span className="font-bold text-[var(--kaan-ink)]">
                 {metricsSummary.before_row_count} → {metricsSummary.after_row_count}
               </span>
             </div>
-            <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
-              <span className="text-slate-400 text-xs block">Missing Cells</span>
-              <span className="font-semibold text-slate-200">
+            <div className="bg-[var(--kaan-cream)] p-3 border border-[var(--kaan-ink)] shadow-[2px_2px_0_var(--kaan-ink)]">
+              <span className="text-slate-500 text-[10px] uppercase font-bold block">Missing Cells</span>
+              <span className="font-bold text-[var(--kaan-ink)]">
                 {metricsSummary.before_missing_cells} → {metricsSummary.after_missing_cells}
               </span>
             </div>
-            <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
-              <span className="text-slate-400 text-xs block">Quality Score</span>
-              <span className="font-semibold text-emerald-400">
+            <div className="bg-[var(--kaan-cream)] p-3 border border-[var(--kaan-ink)] shadow-[2px_2px_0_var(--kaan-ink)]">
+              <span className="text-slate-500 text-[10px] uppercase font-bold block">Quality Score</span>
+              <span className="font-bold text-[var(--kaan-green)]">
                 {metricsSummary.before_quality_score}% → {metricsSummary.after_quality_score}%
               </span>
             </div>
-            <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800">
-              <span className="text-slate-400 text-xs block">Operations Applied</span>
-              <span className="font-semibold text-slate-200">{metricsSummary.operations_applied}</span>
+            <div className="bg-[var(--kaan-cream)] p-3 border border-[var(--kaan-ink)] shadow-[2px_2px_0_var(--kaan-ink)]">
+              <span className="text-slate-500 text-[10px] uppercase font-bold block">Applied Rules</span>
+              <span className="font-bold text-[var(--kaan-ink)]">{metricsSummary.operations_applied}</span>
             </div>
           </div>
         </div>
@@ -314,21 +314,21 @@ export function DatasetPreparationView({
 
       {/* Error alert */}
       {error && (
-        <div className="p-4 bg-rose-950/50 border border-rose-500/50 text-rose-300 rounded-xl text-sm flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+        <div className="p-4 bg-[#FDF0ED] border border-[var(--kaan-ink)] text-[var(--kaan-ink)] text-xs font-mono shadow-[3px_3px_0_var(--kaan-ink)] flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-[var(--kaan-coral)] shrink-0 mt-0.5" />
           <div>
-            <span className="font-semibold block">Preparation Error</span>
+            <span className="font-bold uppercase block">Preparation Error</span>
             {error}
           </div>
         </div>
       )}
 
       {/* Workbench Layout: Controls (Left) vs Plan & Lineage (Right) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-mono">
         {/* Controls Column */}
         <div className="lg:col-span-2 space-y-4">
           {/* Operation Tabs */}
-          <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-2">
+          <div className="flex flex-wrap gap-2 border-b border-[var(--kaan-ink)] pb-2">
             {[
               { id: "missing", label: "Missing Values" },
               { id: "duplicates", label: "Duplicates" },
@@ -340,10 +340,10 @@ export function DatasetPreparationView({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                className={`px-3 py-1.5 text-xs font-mono font-bold uppercase transition-colors rounded-none border border-[var(--kaan-ink)] ${
                   activeTab === tab.id
-                    ? "bg-indigo-600 text-white"
-                    : "bg-slate-800/80 text-slate-300 hover:bg-slate-800"
+                    ? "bg-[var(--kaan-green)] text-white shadow-[2px_2px_0_var(--kaan-ink)]"
+                    : "bg-[var(--kaan-paper)] text-[var(--kaan-ink)] hover:bg-[var(--kaan-cream)]"
                 }`}
               >
                 {tab.label}
@@ -352,7 +352,8 @@ export function DatasetPreparationView({
           </div>
 
           {/* Operation Configuration Form */}
-          <div className="p-4 bg-slate-900/80 border border-slate-800 rounded-xl space-y-4">
+          <div className="p-4 bg-[var(--kaan-paper)] border border-[var(--kaan-ink)] shadow-[4px_4px_0_var(--kaan-ink)] space-y-4">
+
             {/* Target Column Selector */}
             {activeTab !== "duplicates" && (
               <div>

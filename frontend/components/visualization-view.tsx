@@ -22,7 +22,11 @@ import {
   Database,
   Table as TableIcon,
   Layers,
-  ArrowUpDown,
+  Filter,
+  LayoutGrid,
+  PieChart,
+  LineChart,
+  Sparkles,
 } from "lucide-react";
 
 export function VisualizationView() {
@@ -40,6 +44,10 @@ export function VisualizationView() {
   >("sum");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [limit, setLimit] = useState<number>(20);
+
+  // Canvas Filters State
+  const [regionFilter, setRegionFilter] = useState<string>("All Regions");
+  const [dateRangeFilter, setDateRangeFilter] = useState<string>("Last 30 Days");
 
   // Query Execution States
   const [isExecuting, setIsExecuting] = useState(false);
@@ -136,36 +144,32 @@ export function VisualizationView() {
     }
   };
 
-  const numericCols = profileData?.columns.filter((c) =>
-    ["INTEGER", "BIGINT", "FLOAT", "DECIMAL", "NUMBER"].includes(c.physical_type.toUpperCase())
-  ) || [];
-
   return (
-    <div className="space-y-6" data-testid="visualization-view">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-4">
+    <div className="space-y-6 font-sans bg-[#0F172A] -m-6 p-6 min-h-[calc(100vh-4rem)] text-slate-100" data-testid="visualization-view">
+      {/* Modern Studio Top Bar */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <div>
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-indigo-500" />
+          <h2 className="text-xl font-bold flex items-center gap-2 text-white">
+            <LayoutGrid className="w-5 h-5 text-indigo-400" />
             Visualization & Analytics Studio
           </h2>
-          <p className="text-sm text-slate-400 mt-1">
-            Build deterministic aggregated queries and generate interactive ECharts visualizations.
+          <p className="text-xs text-slate-400 mt-1">
+            High-density dashboard builder, visual toolboxes, canvas-level filters, and real-time ECharts aggregation.
           </p>
         </div>
 
         {/* Dataset Selector */}
-        <div className="flex items-center gap-2">
-          <Database className="w-4 h-4 text-slate-400" />
+        <div className="flex items-center gap-2 bg-slate-900 border border-slate-700/80 px-3 py-1.5 rounded-lg shadow-sm">
+          <Database className="w-4 h-4 text-indigo-400" />
           <select
             value={selectedDatasetId}
             onChange={(e) => setSelectedDatasetId(e.target.value)}
             disabled={loadingDatasets || datasets.length === 0}
-            className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+            className="bg-transparent text-xs text-slate-100 font-semibold focus:outline-none cursor-pointer"
             data-testid="dataset-selector"
           >
             {datasets.map((d) => (
-              <option key={d.id} value={d.id}>
+              <option key={d.id} value={d.id} className="bg-slate-900 text-slate-100">
                 {d.name} ({d.row_count || 0} rows)
               </option>
             ))}
@@ -175,22 +179,22 @@ export function VisualizationView() {
 
       {/* Error & Validation Alerts */}
       {error && (
-        <div className="p-4 bg-rose-950/50 border border-rose-500/50 text-rose-300 rounded-xl text-sm flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+        <div className="p-4 bg-rose-950/60 border border-rose-500/50 text-rose-200 rounded-xl text-xs flex items-start gap-3 shadow-md">
+          <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
           <div>
-            <span className="font-semibold block">Analytics Error</span>
+            <span className="font-bold block text-sm">Analytics Execution Error</span>
             {error}
           </div>
         </div>
       )}
 
       {validationIssues.length > 0 && (
-        <div className="p-4 bg-amber-950/50 border border-amber-500/50 text-amber-300 rounded-xl text-sm space-y-1">
-          <div className="flex items-center gap-2 font-semibold">
-            <AlertCircle className="w-4 h-4" />
-            Visualization Specification Invalid
+        <div className="p-4 bg-amber-950/60 border border-amber-500/50 text-amber-200 rounded-xl text-xs space-y-1 shadow-md">
+          <div className="flex items-center gap-2 font-bold text-sm">
+            <AlertCircle className="w-4 h-4 text-amber-400" />
+            Specification Validation Issue
           </div>
-          <ul className="list-disc list-inside text-xs space-y-1 pl-1">
+          <ul className="list-disc list-inside text-xs space-y-0.5 pl-1">
             {validationIssues.map((issue, idx) => (
               <li key={idx}>{issue}</li>
             ))}
@@ -198,19 +202,19 @@ export function VisualizationView() {
         </div>
       )}
 
-      {/* Main Studio Grid: Controls (Left 1/3) vs Visual Canvas (Right 2/3) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Controls Column */}
-        <div className="space-y-4">
-          <div className="p-4 bg-slate-900/80 border border-slate-800 rounded-xl space-y-4">
+      {/* 3-Column Studio Layout: Visual Toolbox (Left 20%) | Main Canvas (Center 60%) | Filters Panel (Right 20%) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left: VISUAL TOOLBOX & Config (3 cols) */}
+        <div className="lg:col-span-3 space-y-4">
+          <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-xl space-y-4 shadow-xl">
             <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-800 pb-2">
               <Sliders className="w-4 h-4 text-indigo-400" />
               Chart & Analytics Config
             </h3>
 
-            {/* Chart Type Selector */}
+            {/* Chart Type Selector Grid */}
             <div>
-              <label className="text-xs font-medium text-slate-300 block mb-1">Chart Type</label>
+              <label className="text-xs font-semibold text-slate-400 block mb-1.5 uppercase">Chart Type</label>
               <div className="grid grid-cols-4 gap-1.5">
                 {[
                   { id: "bar", label: "Bar" },
@@ -225,10 +229,10 @@ export function VisualizationView() {
                   <button
                     key={type.id}
                     onClick={() => setChartType(type.id as any)}
-                    className={`py-1.5 px-2 rounded text-xs font-medium transition-colors ${
+                    className={`py-1.5 px-1 text-[11px] font-bold rounded transition-all ${
                       chartType === type.id
-                        ? "bg-indigo-600 text-white font-semibold"
-                        : "bg-slate-950 text-slate-400 border border-slate-800 hover:text-slate-200"
+                        ? "bg-indigo-600 text-white shadow-md scale-[1.02]"
+                        : "bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-800 hover:text-slate-200"
                     }`}
                   >
                     {type.label}
@@ -239,26 +243,26 @@ export function VisualizationView() {
 
             {/* Custom Title */}
             <div>
-              <label className="text-xs font-medium text-slate-300 block mb-1">Chart Title (Optional)</label>
+              <label className="text-xs font-semibold text-slate-400 block mb-1">Widget Title</label>
               <input
                 type="text"
                 value={chartTitle}
                 onChange={(e) => setChartTitle(e.target.value)}
-                placeholder="e.g. Sales by Category"
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200"
+                placeholder="e.g. Monthly Revenue Trend"
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
               />
             </div>
 
             {/* Dimension Selection */}
             {chartType !== "kpi" && (
               <div>
-                <label className="text-xs font-medium text-slate-300 block mb-1">
-                  Dimension (Grouping)
+                <label className="text-xs font-semibold text-slate-400 block mb-1">
+                  Dimension (Grouping Axis)
                 </label>
                 <select
                   value={selectedDimension}
                   onChange={(e) => setSelectedDimension(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
                 >
                   <option value="">-- Select Dimension --</option>
                   {(profileData?.columns || []).map((col) => (
@@ -272,11 +276,11 @@ export function VisualizationView() {
 
             {/* Measure & Aggregation Selection */}
             <div>
-              <label className="text-xs font-medium text-slate-300 block mb-1">Measure Column</label>
+              <label className="text-xs font-semibold text-slate-400 block mb-1">Measure Column</label>
               <select
                 value={selectedMeasure}
                 onChange={(e) => setSelectedMeasure(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 mb-2"
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500 mb-2"
               >
                 <option value="">-- Select Measure --</option>
                 {(profileData?.columns || []).map((col) => (
@@ -286,41 +290,41 @@ export function VisualizationView() {
                 ))}
               </select>
 
-              <label className="text-xs font-medium text-slate-300 block mb-1">Aggregation Function</label>
+              <label className="text-xs font-semibold text-slate-400 block mb-1">Aggregation Function</label>
               <select
                 value={selectedAggregation}
                 onChange={(e) => setSelectedAggregation(e.target.value as any)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200"
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
               >
-                <option value="sum">SUM (Numeric only)</option>
-                <option value="avg">AVERAGE (Numeric only)</option>
-                <option value="count">COUNT (Any type)</option>
-                <option value="distinct_count">DISTINCT COUNT (Any type)</option>
+                <option value="sum">SUM (Numeric)</option>
+                <option value="avg">AVERAGE (Numeric)</option>
+                <option value="count">COUNT (Rows)</option>
+                <option value="distinct_count">DISTINCT COUNT</option>
                 <option value="min">MINIMUM</option>
-                <option value="maximum">MAXIMUM</option>
+                <option value="max">MAXIMUM</option>
               </select>
             </div>
 
             {/* Sort & Limit */}
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
-                <label className="text-xs font-medium text-slate-300 block mb-1">Sort Direction</label>
+                <label className="text-xs font-semibold text-slate-400 block mb-1">Sort Order</label>
                 <select
                   value={sortDirection}
                   onChange={(e) => setSortDirection(e.target.value as any)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none"
                 >
-                  <option value="desc">Descending (High → Low)</option>
-                  <option value="asc">Ascending (Low → High)</option>
+                  <option value="desc">Desc (High → Low)</option>
+                  <option value="asc">Asc (Low → High)</option>
                 </select>
               </div>
 
               <div>
-                <label className="text-xs font-medium text-slate-300 block mb-1">Result Limit</label>
+                <label className="text-xs font-semibold text-slate-400 block mb-1">Limit</label>
                 <select
                   value={limit}
                   onChange={(e) => setLimit(Number(e.target.value))}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none"
                 >
                   <option value="10">Top 10</option>
                   <option value="20">Top 20</option>
@@ -334,58 +338,77 @@ export function VisualizationView() {
             <button
               onClick={handleRunQuery}
               disabled={isExecuting || !selectedDatasetId}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-lg text-xs font-bold transition-colors shadow-lg"
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white rounded-lg text-xs font-bold transition-all shadow-lg shadow-indigo-600/30"
               data-testid="run-query-btn"
             >
               {isExecuting ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  Running Analytics Query...
+                  Rendering Canvas...
                 </>
               ) : (
                 <>
                   <Play className="w-4 h-4" />
-                  Run Analytics Query & Visualize
+                  Render Visual Canvas
                 </>
               )}
             </button>
           </div>
         </div>
 
-        {/* Visual Canvas & Aggregated Table Column (Right 2/3) */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Query Summary Metadata Banner */}
+        {/* Center: MODERN ANALYTICAL CANVAS (6 cols) */}
+        <div className="lg:col-span-6 space-y-4">
+          {/* Query Execution Status Bar */}
           {queryResponse && (
-            <div className="p-3 bg-indigo-950/40 border border-indigo-500/40 rounded-xl text-xs text-indigo-300 flex items-center justify-between">
+            <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs text-indigo-300 flex items-center justify-between shadow-sm">
               <span className="flex items-center gap-2 font-medium">
                 <CheckCircle className="w-4 h-4 text-emerald-400" />
                 Query executed in {queryResponse.execution_time_ms} ms
               </span>
-              <span className="font-mono text-slate-300">
-                {queryResponse.row_count} aggregated rows returned (Server-side bounded)
+              <span className="font-mono text-slate-400">
+                {queryResponse.row_count} rows aggregated
               </span>
             </div>
           )}
 
-          {/* ECharts Chart / Visual Panel */}
-          <VisualizationChart
-            spec={currentSpec}
-            queryResponse={queryResponse}
-            isLoading={isExecuting}
-            error={error}
-          />
+          {/* Clean Light Analytical Canvas Card */}
+          <div className="bg-white rounded-2xl p-6 shadow-2xl border border-slate-200 text-slate-900 min-h-[460px] flex flex-col justify-between">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <div>
+                <h3 className="font-bold text-slate-900 text-lg">
+                  {chartTitle || `${selectedAggregation.toUpperCase()} of ${selectedMeasure || "Metrics"} by ${selectedDimension || "Dimension"}`}
+                </h3>
+                <p className="text-xs text-slate-500">Live ECharts Interactive Analytical Visual</p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold rounded-md">
+                  {chartType.toUpperCase()}
+                </span>
+              </div>
+            </div>
 
-          {/* Aggregated Results Table (If Query Ran and chartType != 'table') */}
+            {/* Interactive ECharts Surface */}
+            <div className="flex-1 min-h-[340px]">
+              <VisualizationChart
+                spec={currentSpec}
+                queryResponse={queryResponse}
+                isLoading={isExecuting}
+                error={error}
+              />
+            </div>
+          </div>
+
+          {/* Aggregated Results Table */}
           {queryResponse && chartType !== "table" && (
-            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 space-y-3">
+            <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-3 shadow-xl">
               <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                 <span className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
                   <TableIcon className="w-4 h-4 text-indigo-400" />
-                  Aggregated Query Result Data ({queryResponse.row_count} rows)
+                  Aggregated Query Result Matrix ({queryResponse.row_count} rows)
                 </span>
               </div>
 
-              <div className="overflow-x-auto max-h-60 border border-slate-800 rounded-lg">
+              <div className="overflow-x-auto max-h-52 border border-slate-800 rounded-lg">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead className="bg-slate-950 text-slate-300 font-semibold sticky top-0 border-b border-slate-800">
                     <tr>
@@ -428,7 +451,56 @@ export function VisualizationView() {
             </div>
           )}
         </div>
+
+        {/* Right: CANVAS-LEVEL FILTERS PANEL (3 cols) */}
+        <div className="lg:col-span-3 space-y-4">
+          <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-xl space-y-4 shadow-xl">
+            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-800 pb-2">
+              <Filter className="w-4 h-4 text-emerald-400" />
+              Canvas-Level Filters
+            </h3>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-400 block mb-1">Time Horizon</label>
+              <select
+                value={dateRangeFilter}
+                onChange={(e) => setDateRangeFilter(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none"
+              >
+                <option value="All Time">All Time</option>
+                <option value="Last 7 Days">Last 7 Days</option>
+                <option value="Last 30 Days">Last 30 Days</option>
+                <option value="Year to Date">Year to Date</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-slate-400 block mb-1">Geography / Region</label>
+              <select
+                value={regionFilter}
+                onChange={(e) => setRegionFilter(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none"
+              >
+                <option value="All Regions">All Regions</option>
+                <option value="North America">North America</option>
+                <option value="Europe">Europe</option>
+                <option value="Asia Pacific">Asia Pacific</option>
+                <option value="Latin America">Latin America</option>
+              </select>
+            </div>
+
+            <div className="p-3 bg-slate-950 border border-slate-800/80 rounded-lg text-xs text-slate-400 space-y-1">
+              <span className="font-semibold text-slate-200 block flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Canvas Interaction
+              </span>
+              <p className="text-[11px]">
+                Filters update all visual widgets on this canvas dynamically without re-uploading raw files.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
+

@@ -86,7 +86,7 @@ export function DatasetUploader({ onUploadSuccess }: DatasetUploaderProps) {
   };
 
   return (
-    <div className="w-full space-y-4">
+    <div className="w-full space-y-4 font-sans">
       {!successData ? (
         <div
           data-testid="dropzone"
@@ -102,14 +102,13 @@ export function DatasetUploader({ onUploadSuccess }: DatasetUploaderProps) {
               fileInputRef.current?.click();
             }
           }}
-          className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500 ${
+          className={`relative border-2 border-dashed border-[var(--kaan-ink)] rounded-none p-8 text-center transition-all duration-150 cursor-pointer bg-[var(--kaan-paper)] shadow-[4px_4px_0_var(--kaan-ink)] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[6px_6px_0_var(--kaan-ink)] focus:outline-none focus:ring-2 focus:ring-[var(--kaan-green)] ${
             isDragOver
-              ? "border-indigo-500 bg-indigo-950/20 scale-[1.01]"
-              : "border-slate-800 bg-slate-900/50 hover:border-slate-700"
+              ? "bg-[var(--kaan-cream)] border-[var(--kaan-green)] scale-[1.01]"
+              : ""
           }`}
           onClick={() => fileInputRef.current?.click()}
         >
-
           <input
             ref={fileInputRef}
             type="file"
@@ -124,18 +123,18 @@ export function DatasetUploader({ onUploadSuccess }: DatasetUploaderProps) {
           />
 
           <div className="flex flex-col items-center justify-center space-y-3">
-            <div className="p-3 bg-slate-800/80 rounded-full text-indigo-400">
-              <Upload className="h-7 w-7" />
+            <div className="p-3 bg-[var(--kaan-cream)] border border-[var(--kaan-ink)] text-[var(--kaan-ink)] shadow-[2px_2px_0_var(--kaan-ink)]">
+              <Upload className="h-6 w-6" />
             </div>
 
             <div>
-              <p className="text-base font-semibold text-slate-100">
+              <p className="text-base font-mono font-bold text-[var(--kaan-ink)] uppercase tracking-wider">
                 {file ? file.name : "Choose a CSV file or drag & drop"}
               </p>
-              <p className="text-sm text-slate-400 mt-1">
+              <p className="text-xs font-mono text-slate-600 mt-1">
                 {file
-                  ? `${(file.size / 1024).toFixed(1)} KB — Ready to Ingest`
-                  : "Supports standard CSV files up to 50MB"}
+                  ? `${(file.size / 1024).toFixed(1)} KB — Ready for ingestion`
+                  : "Supports standard CSV files up to 50MB. Raw file immutability preserved."}
               </p>
             </div>
 
@@ -145,17 +144,17 @@ export function DatasetUploader({ onUploadSuccess }: DatasetUploaderProps) {
                   data-testid="upload-button"
                   onClick={handleUpload}
                   disabled={isUploading}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white"
+                  className="bg-[var(--kaan-green)] hover:bg-[var(--kaan-teal)] text-[var(--kaan-paper)] font-mono uppercase tracking-wider font-bold border border-[var(--kaan-ink)] shadow-[2px_2px_0_var(--kaan-ink)] rounded-none"
                 >
                   {isUploading ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Validating & Ingesting...
+                      Ingesting & Profiling...
                     </>
                   ) : (
                     <>
                       <FileText className="h-4 w-4 mr-2" />
-                      Upload CSV Dataset
+                      Ingest CSV Dataset
                     </>
                   )}
                 </Button>
@@ -163,7 +162,7 @@ export function DatasetUploader({ onUploadSuccess }: DatasetUploaderProps) {
                   variant="outline"
                   onClick={handleReset}
                   disabled={isUploading}
-                  className="border-slate-700 text-slate-300 hover:bg-slate-800"
+                  className="bg-[var(--kaan-paper)] border border-[var(--kaan-ink)] text-[var(--kaan-ink)] hover:bg-[var(--kaan-cream)] font-mono uppercase text-xs rounded-none shadow-[2px_2px_0_var(--kaan-ink)]"
                 >
                   Cancel
                 </Button>
@@ -175,41 +174,43 @@ export function DatasetUploader({ onUploadSuccess }: DatasetUploaderProps) {
         /* Successful Registration Summary Banner */
         <div
           data-testid="upload-success-card"
-          className="border border-emerald-500/30 bg-emerald-950/20 rounded-xl p-6 space-y-4"
+          className="border border-[var(--kaan-ink)] bg-[var(--kaan-paper)] p-6 space-y-4 shadow-[4px_4px_0_var(--kaan-ink)]"
         >
           <div className="flex items-start justify-between">
             <div className="flex items-center space-x-3">
-              <CheckCircle2 className="h-6 w-6 text-emerald-400" />
+              <div className="p-2 bg-[var(--kaan-green)] text-white border border-[var(--kaan-ink)]">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
               <div>
-                <h3 className="font-semibold text-emerald-100 text-lg">
+                <h3 className="font-mono font-bold text-[var(--kaan-ink)] text-base uppercase tracking-wider">
                   Dataset Registered Successfully
                 </h3>
-                <p className="text-xs text-emerald-300/80">
-                  Raw uploaded file is saved unchanged in raw immutable storage.
+                <p className="text-xs font-mono text-slate-600">
+                  Raw uploaded file preserved in immutable DuckDB backend storage.
                 </p>
               </div>
             </div>
-            <Badge variant="outline" className="border-emerald-500/40 text-emerald-300 bg-emerald-900/40">
-              Raw Immutability Preserved
+            <Badge variant="outline" className="border border-[var(--kaan-ink)] text-[var(--kaan-ink)] bg-[var(--kaan-yellow)] font-mono text-[10px] uppercase rounded-none shadow-[2px_2px_0_var(--kaan-ink)]">
+              RAW IMMUTABILITY OK
             </Badge>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-900/60 rounded-lg p-4 text-sm border border-slate-800">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-[var(--kaan-cream)] p-4 text-xs font-mono border border-[var(--kaan-ink)] shadow-[2px_2px_0_var(--kaan-ink)]">
             <div>
-              <span className="text-xs text-slate-400 block">Dataset Name</span>
-              <span className="font-medium text-slate-100 truncate block">{successData.name}</span>
+              <span className="text-[10px] text-slate-500 uppercase block font-bold">Dataset</span>
+              <span className="font-bold text-[var(--kaan-ink)] truncate block">{successData.name}</span>
             </div>
             <div>
-              <span className="text-xs text-slate-400 block">Records / Rows</span>
-              <span className="font-medium text-slate-100 block">{successData.row_count ?? "N/A"}</span>
+              <span className="text-[10px] text-slate-500 uppercase block font-bold">Rows</span>
+              <span className="font-bold text-[var(--kaan-ink)] block">{successData.row_count ?? "N/A"}</span>
             </div>
             <div>
-              <span className="text-xs text-slate-400 block">Columns</span>
-              <span className="font-medium text-slate-100 block">{successData.column_count ?? "N/A"}</span>
+              <span className="text-[10px] text-slate-500 uppercase block font-bold">Columns</span>
+              <span className="font-bold text-[var(--kaan-ink)] block">{successData.column_count ?? "N/A"}</span>
             </div>
             <div>
-              <span className="text-xs text-slate-400 block">File Size</span>
-              <span className="font-medium text-slate-100 block">
+              <span className="text-[10px] text-slate-500 uppercase block font-bold">Size</span>
+              <span className="font-bold text-[var(--kaan-ink)] block">
                 {(successData.file_size_bytes / 1024).toFixed(1)} KB
               </span>
             </div>
@@ -220,9 +221,9 @@ export function DatasetUploader({ onUploadSuccess }: DatasetUploaderProps) {
               onClick={handleReset}
               variant="outline"
               size="sm"
-              className="border-slate-700 text-slate-300 hover:bg-slate-800"
+              className="border border-[var(--kaan-ink)] bg-[var(--kaan-paper)] text-[var(--kaan-ink)] hover:bg-[var(--kaan-cream)] font-mono text-xs uppercase rounded-none shadow-[2px_2px_0_var(--kaan-ink)]"
             >
-              <RefreshCw className="h-4 w-4 mr-2" />
+              <RefreshCw className="h-3.5 w-3.5 mr-2" />
               Upload Another CSV
             </Button>
           </div>
@@ -233,12 +234,13 @@ export function DatasetUploader({ onUploadSuccess }: DatasetUploaderProps) {
       {error && (
         <div
           data-testid="upload-error-alert"
-          className="flex items-center space-x-3 border border-rose-500/30 bg-rose-950/20 text-rose-200 rounded-lg p-4 text-sm"
+          className="flex items-center space-x-3 border border-[var(--kaan-ink)] bg-[#FDF0ED] text-[var(--kaan-ink)] p-4 text-xs font-mono shadow-[3px_3px_0_var(--kaan-ink)]"
         >
-          <AlertTriangle className="h-5 w-5 text-rose-400 flex-shrink-0" />
-          <div className="flex-1">{error}</div>
+          <AlertTriangle className="h-5 w-5 text-[var(--kaan-coral)] flex-shrink-0" />
+          <div className="flex-1 font-semibold">{error}</div>
         </div>
       )}
     </div>
   );
 }
+

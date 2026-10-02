@@ -4,36 +4,58 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --border: 214.3 31.8% 91.4%;
-    --radius: 0.5rem;
+    --background: 42 38% 93%;
+    --foreground: 150 18% 13%;
+
+    --card: 42 42% 97%;
+    --card-foreground: 150 18% 13%;
+
+    --primary: 162 48% 34%;
+    --primary-foreground: 42 42% 97%;
+
+    --secondary: 39 36% 87%;
+    --secondary-foreground: 150 18% 13%;
+
+    --muted: 40 25% 88%;
+    --muted-foreground: 150 9% 39%;
+
+    --accent: 11 82% 63%;
+    --accent-foreground: 42 42% 97%;
+
+    --border: 150 12% 20%;
+    --radius: 0.15rem;
+
+    --kaan-cream: #f3ead8;
+    --kaan-paper: #faf5e9;
+    --kaan-ink: #17231e;
+    --kaan-green: #2f725f;
+    --kaan-teal: #38a892;
+    --kaan-coral: #ef705c;
+    --kaan-yellow: #e8bd4a;
+    --kaan-lilac: #a89bd8;
+    --kaan-blue: #78a9d5;
   }
 
   .dark {
-    --background: 224 71% 4%;
-    --foreground: 213 31% 91%;
-    --card: 224 71% 6%;
-    --card-foreground: 213 31% 91%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
+    --background: 42 38% 93%;
+    --foreground: 150 18% 13%;
+
+    --card: 42 42% 97%;
+    --card-foreground: 150 18% 13%;
+
+    --primary: 162 48% 34%;
+    --primary-foreground: 42 42% 97%;
+
+    --secondary: 39 36% 87%;
+    --secondary-foreground: 150 18% 13%;
+
+    --muted: 40 25% 88%;
+    --muted-foreground: 150 9% 39%;
+
+    --accent: 11 82% 63%;
+    --accent-foreground: 42 42% 97%;
+
+    --border: 150 12% 20%;
   }
 }
 
@@ -41,7 +63,70 @@
   * {
     @apply border-border;
   }
+
+  html {
+    background: var(--kaan-cream);
+  }
+
   body {
-    @apply bg-background text-foreground antialiased font-sans min-h-screen flex flex-col;
+    @apply text-foreground antialiased min-h-screen;
+    font-family:
+      "Courier New",
+      Courier,
+      monospace;
+    background-color: var(--kaan-cream);
+
+    background-image:
+      radial-gradient(rgba(23, 35, 30, 0.18) 0.75px,
+        transparent 0.75px);
+    background-size: 7px 7px;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font-family: inherit;
+  }
+
+  ::selection {
+    background: var(--kaan-coral);
+    color: var(--kaan-paper);
+  }
+}
+
+@layer components {
+  .retro-panel {
+    background: var(--kaan-paper);
+    border: 1px solid var(--kaan-ink);
+    box-shadow: 4px 4px 0 var(--kaan-ink);
+  }
+
+  .retro-label {
+    font-size: 0.68rem;
+    line-height: 1;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+
+  .retro-rule {
+    border-top: 1px dashed rgba(23, 35, 30, 0.5);
+  }
+
+  .retro-dot-grid {
+    background-image:
+      radial-gradient(rgba(23, 35, 30, 0.2) 0.8px,
+        transparent 0.8px);
+    background-size: 8px 8px;
+  }
+
+  .retro-stamp {
+    border: 1px solid var(--kaan-ink);
+    padding: 0.25rem 0.45rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.65rem;
+    transform: rotate(-1deg);
   }
 }

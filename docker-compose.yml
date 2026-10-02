@@ -50,7 +50,7 @@ services:
       - STORAGE_PROCESSED_PATH=/app/storage/processed
       - STORAGE_METADATA_PATH=/app/storage/metadata
       - STORAGE_EXPORTS_PATH=/app/storage/exports
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001}
       - AI_ENABLED=${AI_ENABLED:-true}
       - AI_PROVIDER=${AI_PROVIDER:-nvidia}
       - NVIDIA_API_KEY=${NVIDIA_API_KEY:-}

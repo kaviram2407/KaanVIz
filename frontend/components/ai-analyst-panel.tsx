@@ -199,119 +199,116 @@ export function AIAnalystPanel({ datasetId, dashboardId, onApproveVisual }: AIAn
   const isAIEnabled = aiStatus?.status === "enabled" || aiStatus?.enabled === true;
 
   return (
-    <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-6 shadow-xl space-y-6">
+    <div className="bg-[var(--kaan-paper)] border border-[var(--kaan-ink)] p-6 shadow-[4px_4px_0_var(--kaan-ink)] space-y-6 font-sans">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--kaan-ink)] pb-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-cyan-500/10 border border-cyan-500/30 rounded-lg text-cyan-400">
-            <Bot className="w-6 h-6" />
+          <div className="p-2.5 bg-[var(--kaan-cream)] border border-[var(--kaan-ink)] text-[var(--kaan-ink)] shadow-[2px_2px_0_var(--kaan-ink)] font-mono">
+            <Bot className="w-6 h-6 text-[var(--kaan-ink)]" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-100 flex items-center gap-2">
-              KaanViz AI Analyst
-              <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-medium">
-                Phase 8 — Optional
-              </span>
+            <h2 className="text-xl font-mono font-bold text-[var(--kaan-ink)] flex items-center gap-2 uppercase tracking-wide">
+              KaanViz AI Analyst Workstation
             </h2>
-            <p className="text-sm text-slate-400">
+            <p className="text-xs font-mono text-slate-600">
               Natural-language data Q&A, prompt-to-visual generation, Explain Visual & structured insights.
             </p>
           </div>
         </div>
 
         {/* AI Status Badge */}
-        <div>
+        <div className="font-mono">
           {aiStatus ? (
             isAIEnabled ? (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold bg-[var(--kaan-green)] text-white border border-[var(--kaan-ink)] shadow-[2px_2px_0_var(--kaan-ink)] uppercase">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                AI Active ({aiStatus.provider})
+                AI ACTIVE ({aiStatus.provider})
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold bg-[var(--kaan-yellow)] text-[var(--kaan-ink)] border border-[var(--kaan-ink)] shadow-[2px_2px_0_var(--kaan-ink)] uppercase">
                 <AlertTriangle className="w-3.5 h-3.5" />
-                AI Disabled / Unconfigured
+                AI DISABLED
               </span>
             )
           ) : (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 animate-pulse">
-              Checking AI Status...
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-bold bg-[var(--kaan-cream)] border border-[var(--kaan-ink)] text-[var(--kaan-ink)] animate-pulse">
+              CHECKING STATUS...
             </span>
           )}
         </div>
       </div>
 
       {/* AI Provider Settings & Control Bar */}
-      <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 text-xs">
-        <div className="flex flex-wrap items-center gap-6 text-slate-300">
+      <div className="bg-[var(--kaan-cream)] border border-[var(--kaan-ink)] p-4 flex flex-wrap items-center justify-between gap-4 text-xs font-mono shadow-[2px_2px_0_var(--kaan-ink)]">
+        <div className="flex flex-wrap items-center gap-6 text-[var(--kaan-ink)] font-bold">
           <div className="flex items-center gap-2">
-            <Cpu className="w-4 h-4 text-cyan-400" />
-            <span className="text-slate-400 font-medium">Provider:</span>
-            <span className="font-semibold text-slate-100 uppercase tracking-wide">
+            <Cpu className="w-4 h-4 text-[var(--kaan-ink)]" />
+            <span className="text-slate-500 uppercase">Provider:</span>
+            <span className="uppercase tracking-wide text-[var(--kaan-ink)]">
               {aiStatus?.provider || "none"}
             </span>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-slate-400 font-medium">Model:</span>
-            <span className="font-mono text-cyan-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+            <span className="text-slate-500 uppercase">Model:</span>
+            <span className="bg-[var(--kaan-paper)] border border-[var(--kaan-ink)] px-2 py-0.5 text-[var(--kaan-ink)]">
               {aiStatus?.model || "none"}
             </span>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-slate-400 font-medium">AI Status:</span>
+            <span className="text-slate-500 uppercase">AI Switch:</span>
             <button
               onClick={handleToggleAI}
               disabled={toggleLoading}
               role="switch"
               aria-checked={isAIEnabled}
               aria-label="Toggle AI Analyst Enabled State"
-              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 ${
-                isAIEnabled ? "bg-cyan-600" : "bg-slate-700"
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer border border-[var(--kaan-ink)] transition-colors duration-150 ${
+                isAIEnabled ? "bg-[var(--kaan-green)]" : "bg-slate-400"
               }`}
             >
               <span
-                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                className={`pointer-events-none inline-block h-4 w-4 transform bg-white border border-[var(--kaan-ink)] transition duration-150 ${
                   isAIEnabled ? "translate-x-4" : "translate-x-0"
                 }`}
               />
             </button>
             <span
-              className={`px-2 py-0.5 rounded font-semibold text-[11px] ${
+              className={`px-2 py-0.5 font-bold uppercase text-[10px] border border-[var(--kaan-ink)] ${
                 isAIEnabled
-                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-                  : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
+                  ? "bg-[var(--kaan-green)] text-white"
+                  : "bg-[var(--kaan-yellow)] text-[var(--kaan-ink)]"
               }`}
             >
-              {isAIEnabled ? "Enabled" : "Disabled"}
+              {isAIEnabled ? "ENABLED" : "DISABLED"}
             </span>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-slate-400 font-medium">Connection:</span>
+            <span className="text-slate-500 uppercase">Connection:</span>
             <span
-              className={`px-2 py-0.5 rounded font-semibold text-[11px] flex items-center gap-1 ${
+              className={`px-2 py-0.5 font-bold uppercase text-[10px] border border-[var(--kaan-ink)] ${
                 !isAIEnabled
-                  ? "bg-slate-800 text-slate-400 border border-slate-700"
+                  ? "bg-[var(--kaan-paper)] text-slate-500"
                   : testResult
                   ? testResult.success
-                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-                    : "bg-rose-500/10 text-rose-400 border border-rose-500/30"
+                    ? "bg-[var(--kaan-green)] text-white"
+                    : "bg-[var(--kaan-coral)] text-white"
                   : aiStatus?.configured
-                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-                  : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
+                  ? "bg-[var(--kaan-green)] text-white"
+                  : "bg-[var(--kaan-yellow)] text-[var(--kaan-ink)]"
               }`}
             >
               {!isAIEnabled
-                ? "Disabled"
+                ? "DISABLED"
                 : testResult
                 ? testResult.success
-                  ? "Connected"
-                  : "Unavailable"
+                  ? "CONNECTED"
+                  : "OFFLINE"
                 : aiStatus?.configured
-                ? "Connected"
-                : "Not Connected"}
+                ? "CONNECTED"
+                : "NOT CONNECTED"}
             </span>
           </div>
         </div>
@@ -319,29 +316,29 @@ export function AIAnalystPanel({ datasetId, dashboardId, onApproveVisual }: AIAn
         <button
           onClick={handleTestConnection}
           disabled={testLoading || !isAIEnabled}
-          className="px-3.5 py-1.5 bg-cyan-950/80 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-500/30 font-medium rounded-lg flex items-center gap-2 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+          className="px-3.5 py-1.5 bg-[var(--kaan-paper)] hover:bg-[var(--kaan-cream)] text-[var(--kaan-ink)] border border-[var(--kaan-ink)] font-mono font-bold uppercase rounded-none shadow-[2px_2px_0_var(--kaan-ink)] flex items-center gap-2 transition-colors disabled:opacity-50"
         >
-          <Activity className="w-3.5 h-3.5 text-cyan-400" />
-          {testLoading ? "Testing Connection..." : "Test Connection"}
+          <Activity className="w-3.5 h-3.5 text-[var(--kaan-ink)]" />
+          {testLoading ? "TESTING..." : "TEST CONNECTION"}
         </button>
       </div>
 
       {/* Test Connection Result Banner */}
       {testResult && (
         <div
-          className={`p-3 rounded-lg border text-xs flex items-center justify-between ${
+          className={`p-3 border text-xs font-mono shadow-[2px_2px_0_var(--kaan-ink)] flex items-center justify-between ${
             testResult.success
-              ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-300"
-              : "bg-rose-950/40 border-rose-500/40 text-rose-300"
+              ? "bg-[var(--kaan-cream)] border-[var(--kaan-ink)] text-[var(--kaan-ink)]"
+              : "bg-[#FDF0ED] border-[var(--kaan-ink)] text-[var(--kaan-coral)] font-bold"
           }`}
         >
           <div className="flex items-center gap-2">
-            {testResult.success ? <Check className="w-4 h-4 text-emerald-400" /> : <AlertTriangle className="w-4 h-4 text-rose-400" />}
+            {testResult.success ? <Check className="w-4 h-4 text-[var(--kaan-green)]" /> : <AlertTriangle className="w-4 h-4 text-[var(--kaan-coral)]" />}
             <span>
               {testResult.success ? "Connected: NVIDIA Nemotron is available." : `Unavailable: ${testResult.message}`} (Provider: {testResult.provider}, Model: {testResult.model})
             </span>
           </div>
-          <button onClick={() => setTestResult(null)} className="text-slate-400 hover:text-slate-200">
+          <button onClick={() => setTestResult(null)} className="p-0.5 hover:text-black">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -349,36 +346,36 @@ export function AIAnalystPanel({ datasetId, dashboardId, onApproveVisual }: AIAn
 
       {/* Disabled Banner Notice */}
       {!isAIEnabled && aiStatus && (
-        <div className="p-4 bg-amber-950/30 border border-amber-500/30 rounded-lg text-amber-300 text-sm flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 shrink-0 text-amber-400 mt-0.5" />
+        <div className="p-4 bg-[#FDF0ED] border border-[var(--kaan-ink)] text-[var(--kaan-ink)] font-mono text-xs shadow-[3px_3px_0_var(--kaan-ink)] flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 shrink-0 text-[var(--kaan-coral)] mt-0.5" />
           <div>
-            <span className="font-semibold text-amber-200">AI Analyst is currently unavailable or disabled.</span>
-            <p className="mt-1 text-xs text-amber-300/80">
-              {aiStatus.message || "Set AI_ENABLED=true and configure AI_PROVIDER in environment variables."} Core KaanViz deterministic analytics, query engine, and interactive dashboard builder remain 100% operational.
+            <span className="font-bold uppercase block text-sm">AI Disabled / Unconfigured</span>
+            <p className="mt-1 text-xs text-slate-700 font-mono">
+              AI Analyst is currently unavailable or disabled. {aiStatus.message || "Set AI_ENABLED=true and configure AI_PROVIDER in environment variables."} Core KaanViz deterministic analytics, query engine, and interactive dashboard builder remain 100% operational.
             </p>
           </div>
         </div>
       )}
 
       {/* Navigation Tabs */}
-      <div className="flex border-b border-slate-800 gap-2">
+      <div className="flex border-b border-[var(--kaan-ink)] gap-2 font-mono">
         <button
           onClick={() => setActiveTab("query")}
-          className={`flex items-center gap-2 px-4 py-2.5 font-medium text-sm border-b-2 transition-colors ${
+          className={`flex items-center gap-2 px-4 py-2 font-bold text-xs uppercase border border-[var(--kaan-ink)] transition-colors rounded-none ${
             activeTab === "query"
-              ? "border-cyan-400 text-cyan-400 bg-cyan-500/5"
-              : "border-transparent text-slate-400 hover:text-slate-200"
+              ? "bg-[var(--kaan-green)] text-white shadow-[2px_2px_0_var(--kaan-ink)]"
+              : "bg-[var(--kaan-paper)] text-[var(--kaan-ink)] hover:bg-[var(--kaan-cream)]"
           }`}
         >
           <HelpCircle className="w-4 h-4" />
-          Natural-Language Question
+          Natural Language Q&A
         </button>
         <button
           onClick={() => setActiveTab("visualize")}
-          className={`flex items-center gap-2 px-4 py-2.5 font-medium text-sm border-b-2 transition-colors ${
+          className={`flex items-center gap-2 px-4 py-2 font-bold text-xs uppercase border border-[var(--kaan-ink)] transition-colors rounded-none ${
             activeTab === "visualize"
-              ? "border-cyan-400 text-cyan-400 bg-cyan-500/5"
-              : "border-transparent text-slate-400 hover:text-slate-200"
+              ? "bg-[var(--kaan-green)] text-white shadow-[2px_2px_0_var(--kaan-ink)]"
+              : "bg-[var(--kaan-paper)] text-[var(--kaan-ink)] hover:bg-[var(--kaan-cream)]"
           }`}
         >
           <BarChart3 className="w-4 h-4" />
@@ -386,10 +383,10 @@ export function AIAnalystPanel({ datasetId, dashboardId, onApproveVisual }: AIAn
         </button>
         <button
           onClick={() => setActiveTab("insights")}
-          className={`flex items-center gap-2 px-4 py-2.5 font-medium text-sm border-b-2 transition-colors ${
+          className={`flex items-center gap-2 px-4 py-2 font-bold text-xs uppercase border border-[var(--kaan-ink)] transition-colors rounded-none ${
             activeTab === "insights"
-              ? "border-cyan-400 text-cyan-400 bg-cyan-500/5"
-              : "border-transparent text-slate-400 hover:text-slate-200"
+              ? "bg-[var(--kaan-green)] text-white shadow-[2px_2px_0_var(--kaan-ink)]"
+              : "bg-[var(--kaan-paper)] text-[var(--kaan-ink)] hover:bg-[var(--kaan-cream)]"
           }`}
         >
           <Lightbulb className="w-4 h-4" />
@@ -397,10 +394,10 @@ export function AIAnalystPanel({ datasetId, dashboardId, onApproveVisual }: AIAn
         </button>
         <button
           onClick={() => setActiveTab("explain")}
-          className={`flex items-center gap-2 px-4 py-2.5 font-medium text-sm border-b-2 transition-colors ${
+          className={`flex items-center gap-2 px-4 py-2 font-bold text-xs uppercase border border-[var(--kaan-ink)] transition-colors rounded-none ${
             activeTab === "explain"
-              ? "border-cyan-400 text-cyan-400 bg-cyan-500/5"
-              : "border-transparent text-slate-400 hover:text-slate-200"
+              ? "bg-[var(--kaan-green)] text-white shadow-[2px_2px_0_var(--kaan-ink)]"
+              : "bg-[var(--kaan-paper)] text-[var(--kaan-ink)] hover:bg-[var(--kaan-cream)]"
           }`}
         >
           <Sparkles className="w-4 h-4" />
